@@ -1,0 +1,6 @@
+@Worknest.Services.Core_HostAddress = http://localhost:5192
+
+GET {{Worknest.Services.Core_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

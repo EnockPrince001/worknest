@@ -1,0 +1,13 @@
+## Ignore Visual Studio temporary files, build results, and user-specific files ##
+.vs/
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userprefs
+*.usertasks
+*.sln.docstates
+*.db
+*.lock.json
