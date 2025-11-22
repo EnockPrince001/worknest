@@ -13,5 +13,6 @@ namespace Worknest.Services.Core.Models
         public WorkItemStatus? Status { get; set; }
         public int? StoryPoints { get; set; }
         public bool? Flagged { get; set; }
+        public DateTime? DueDate { get; set; }
     }
 }

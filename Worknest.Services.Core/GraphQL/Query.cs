@@ -110,5 +110,14 @@ namespace Worknest.Services.Core.GraphQL
             return context.WorkItems
                 .Where(wi => wi.Key.StartsWith(spaceKey + "-"));
         }
+
+        [Authorize]
+        [UseProjection] // This is CRITICAL. It allows fetching comments, subtasks, and users in one query.
+        public IQueryable<WorkItem> GetWorkItem(
+            Guid id,
+            [Service] AppDbContext context)
+        {
+            return context.WorkItems.Where(wi => wi.Id == id);
+        }
     }
 }

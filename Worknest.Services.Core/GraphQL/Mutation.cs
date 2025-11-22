@@ -97,8 +97,7 @@ namespace Worknest.Services.Core.GraphQL
         return sprint;
     }
 
-        // ... existing code ...
-
+        
         [Authorize]
         public async Task<Sprint> StartSprint(
             Guid sprintId,
@@ -346,9 +345,12 @@ namespace Worknest.Services.Core.GraphQL
         {
             workItem.Flagged = input.Flagged.Value;
         }
-
-        // Always update the 'UpdatedDate'
-        workItem.UpdatedDate = DateTime.UtcNow;
+         if (input.DueDate.HasValue)
+            {
+                workItem.DueDate = input.DueDate.Value;
+            }
+            // Always update the 'UpdatedDate'
+            workItem.UpdatedDate = DateTime.UtcNow;
 
         // 5. Save to database
         await context.SaveChangesAsync();
@@ -422,5 +424,99 @@ namespace Worknest.Services.Core.GraphQL
         // 8. Return the new membership record
         return newMember;
     }
-}
+
+        [Authorize]
+        public async Task<Comment> AddComment(
+            Guid workItemId,
+            string content,
+            [Service] AppDbContext context,
+            ClaimsPrincipal claimsPrincipal)
+        {
+            // 1. Get User ID
+            var userIdString = claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = Guid.Parse(userIdString);
+
+            // 2. Validate Work Item exists
+            var workItem = await context.WorkItems.FindAsync(workItemId);
+            if (workItem == null)
+            {
+                throw new HotChocolate.GraphQLException("Work item not found.");
+            }
+
+            // 3. Create Comment
+            var comment = new Comment
+            {
+                Content = content,
+                WorkItemId = workItemId,
+                AuthorId = userId,
+                CreatedDate = DateTime.UtcNow
+            };
+
+            context.Comments.Add(comment);
+            await context.SaveChangesAsync();
+
+            // 4. Load Author for return
+            await context.Entry(comment).Reference(c => c.Author).LoadAsync();
+
+            return comment;
+        }
+
+        [Authorize]
+        public async Task<WorkItem> CreateSubtask(
+            Guid parentWorkItemId,
+            CreateWorkItemInput input,
+            [Service] AppDbContext context,
+            ClaimsPrincipal claimsPrincipal)
+        {
+            // 1. Get User ID
+            var userIdString = claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = Guid.Parse(userIdString);
+
+            // 2. Find Parent Item to get the Space ID and Key structure
+            var parentItem = await context.WorkItems
+                .Include(wi => wi.Sprint) // Optional: Inherit sprint?
+                .FirstOrDefaultAsync(wi => wi.Id == parentWorkItemId);
+
+            if (parentItem == null)
+            {
+                throw new HotChocolate.GraphQLException("Parent work item not found.");
+            }
+
+            // 3. Get Space (to generate the Key)
+            // We derive the space from the parent item's key (e.g. "MFP-1" -> "MFP")
+            var spaceKeyString = parentItem.Key.Split('-')[0];
+            var space = await context.Spaces.FirstOrDefaultAsync(s => s.Key == spaceKeyString);
+
+            if (space == null) throw new Exception("Space data corruption: Parent item has invalid key.");
+
+            // 4. Generate Key (e.g. MFP-12)
+            var itemKey = await GetNextWorkItemKey(context, space.Id);
+
+            // 5. Create Subtask
+            var subtask = new WorkItem
+            {
+                Summary = input.Summary,
+                Key = $"{space.Key}-{itemKey}",
+                ReporterId = userId,
+                // Inherit Sprint from parent? Or allow it to be separate? 
+                // Usually subtasks stay with the parent, but let's leave it null (Backlog) for now unless specified.
+                SprintId = parentItem.SprintId,
+                AssigneeId = input.AssigneeId,
+                Description = input.Description,
+                Priority = input.Priority ?? WorkItemPriority.MEDIUM,
+                Status = input.Status ?? WorkItemStatus.TO_DO,
+                StoryPoints = input.StoryPoints,
+                ParentWorkItemId = parentWorkItemId, // <--- LINK TO PARENT
+                CreatedDate = DateTime.UtcNow,
+                UpdatedDate = DateTime.UtcNow
+            };
+
+            context.WorkItems.Add(subtask);
+            await context.SaveChangesAsync();
+
+            await context.Entry(subtask).Reference(wi => wi.Reporter).LoadAsync();
+
+            return subtask;
+        }
+    }
 }

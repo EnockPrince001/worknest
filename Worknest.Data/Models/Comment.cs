@@ -13,16 +13,16 @@ namespace Worknest.Data.Models
 
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
-        // --- Relationships ---
-
-        [Required]
-        public Guid AuthorId { get; set; }
-        [ForeignKey("AuthorId")]
-        public User Author { get; set; }
-
+        // Relationship to WorkItem
         [Required]
         public Guid WorkItemId { get; set; }
         [ForeignKey("WorkItemId")]
         public WorkItem WorkItem { get; set; }
+
+        // Relationship to Author (User)
+        [Required]
+        public Guid AuthorId { get; set; }
+        [ForeignKey("AuthorId")]
+        public User Author { get; set; }
     }
 }
