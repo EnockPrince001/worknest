@@ -1,12 +1,12 @@
-﻿using Microsoft.AspNetCore.Identity; // <-- 1. ADD THIS
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore; // <-- 2. ADD THIS
+﻿using Microsoft.AspNetCore.Identity; 
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore; 
 using Microsoft.EntityFrameworkCore;
 using Worknest.Data.Enums;
 using Worknest.Data.Models;
 
 namespace Worknest.Data
 {
-    // 3. CHANGE THIS LINE to inherit from IdentityDbContext
+    
     public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
@@ -18,6 +18,7 @@ namespace Worknest.Data
         public DbSet<Sprint> Sprints { get; set; }
         public DbSet<WorkItem> WorkItems { get; set; }
         public DbSet<Comment> Comments { get; set; }
+        public DbSet<BoardColumn> BoardColumns { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -72,12 +73,25 @@ namespace Worknest.Data
                 .HasForeignKey(s => s.OwnerId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Space -> BoardColumns
+            modelBuilder.Entity<Space>()
+                .HasMany(s => s.BoardColumns)
+                .WithOne(c => c.Space)
+                .HasForeignKey(c => c.SpaceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // WorkItem -> BoardColumn
+            modelBuilder.Entity<WorkItem>()
+                .HasOne(wi => wi.BoardColumn)
+                .WithMany()
+                .HasForeignKey(wi => wi.BoardColumnId)
+                .OnDelete(DeleteBehavior.Restrict); // Don't delete column if it has tasks!
+
             // Convert all Enums to strings in the database
             modelBuilder.Entity<Space>().Property(s => s.Type).HasConversion<string>();
             modelBuilder.Entity<SpaceMember>().Property(sm => sm.Role).HasConversion<string>();
             modelBuilder.Entity<Sprint>().Property(s => s.Status).HasConversion<string>();
             modelBuilder.Entity<WorkItem>().Property(wi => wi.Priority).HasConversion<string>();
-            modelBuilder.Entity<WorkItem>().Property(wi => wi.Status).HasConversion<string>();
         }
     }
 }

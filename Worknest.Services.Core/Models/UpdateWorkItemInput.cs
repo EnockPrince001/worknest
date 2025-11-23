@@ -10,7 +10,7 @@ namespace Worknest.Services.Core.Models
         public Guid? AssigneeId { get; set; }
         public string? Description { get; set; }
         public WorkItemPriority? Priority { get; set; }
-        public WorkItemStatus? Status { get; set; }
+        public Guid? BoardColumnId { get; set; }
         public int? StoryPoints { get; set; }
         public bool? Flagged { get; set; }
         public DateTime? DueDate { get; set; }

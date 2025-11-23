@@ -29,5 +29,6 @@ namespace Worknest.Data.Models
 
         // A space has many sprints (if Scrum)
         public ICollection<Sprint> Sprints { get; set; } = new List<Sprint>();
+        public ICollection<BoardColumn> BoardColumns { get; set; } = new List<BoardColumn>();
     }
 }

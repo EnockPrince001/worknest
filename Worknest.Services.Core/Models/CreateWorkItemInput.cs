@@ -16,7 +16,6 @@ namespace Worknest.Services.Core.Models
         public Guid? AssigneeId { get; set; }
         public string? Description { get; set; }
         public WorkItemPriority? Priority { get; set; } = WorkItemPriority.MEDIUM;
-        public WorkItemStatus? Status { get; set; } = WorkItemStatus.TO_DO;
         public int? StoryPoints { get; set; }
         public Guid? ParentWorkItemId { get; set; } // For subtasks
     }

@@ -17,9 +17,7 @@ namespace Worknest.Data.Models
 
         public string? Description { get; set; }
 
-        public WorkItemStatus Status { get; set; }
-
-        public WorkItemPriority Priority { get; set; }
+       public WorkItemPriority Priority { get; set; }
 
         public int? StoryPoints { get; set; }
 
@@ -37,6 +35,10 @@ namespace Worknest.Data.Models
         public Guid ReporterId { get; set; }
         [ForeignKey("ReporterId")]
         public User Reporter { get; set; }
+
+        public Guid? BoardColumnId { get; set; }
+        [ForeignKey("BoardColumnId")]
+        public BoardColumn? BoardColumn { get; set; }
 
         public Guid? AssigneeId { get; set; }
         [ForeignKey("AssigneeId")]
