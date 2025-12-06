@@ -267,7 +267,14 @@ namespace Worknest.Services.Core.GraphQL
 
             // --- Apply Updates ---
             if (input.Summary != null) workItem.Summary = input.Summary;
-            if (input.SprintId.HasValue) workItem.SprintId = input.SprintId.Value;
+            if (input.MoveToBacklog == true)
+            {
+                workItem.SprintId = null; // Move to backlog
+            }
+            else if (input.SprintId.HasValue)
+            {
+                workItem.SprintId = input.SprintId.Value;
+            }
             if (input.AssigneeId.HasValue) workItem.AssigneeId = input.AssigneeId.Value;
             if (input.Description != null) workItem.Description = input.Description;
             if (input.Priority.HasValue) workItem.Priority = input.Priority.Value;
@@ -287,6 +294,38 @@ namespace Worknest.Services.Core.GraphQL
             await context.Entry(workItem).Reference(wi => wi.Reporter).LoadAsync();
             if (workItem.AssigneeId.HasValue) await context.Entry(workItem).Reference(wi => wi.Assignee).LoadAsync();
             await context.Entry(workItem).Reference(wi => wi.BoardColumn).LoadAsync();
+
+            return workItem;
+        }
+
+        [Authorize]
+        public async Task<WorkItem> DeleteWorkItem(
+            Guid workItemId,
+            [Service] AppDbContext context,
+            ClaimsPrincipal claimsPrincipal)
+        {
+            var userId = Guid.Parse(claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier));
+            var workItem = await context.WorkItems.FindAsync(workItemId);
+
+            if (workItem == null) throw new HotChocolate.GraphQLException("Work item not found.");
+
+            // Security check
+            var spaceKey = workItem.Key.Split('-').First();
+            var isMember = await context.SpaceMembers.AsNoTracking()
+                .AnyAsync(m => m.UserId == userId && m.Space.Key == spaceKey);
+
+            if (!isMember) throw new HotChocolate.GraphQLException(new Error("Not authorized.", "AUTH_NOT_MEMBER"));
+
+            // Delete related comments first
+            var comments = await context.Comments.Where(c => c.WorkItemId == workItemId).ToListAsync();
+            context.Comments.RemoveRange(comments);
+
+            // Delete subtasks
+            var subtasks = await context.WorkItems.Where(w => w.ParentWorkItemId == workItemId).ToListAsync();
+            context.WorkItems.RemoveRange(subtasks);
+
+            context.WorkItems.Remove(workItem);
+            await context.SaveChangesAsync();
 
             return workItem;
         }
