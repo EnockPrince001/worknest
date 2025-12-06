@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Text;
 using Worknest.Data.Models;
 using Worknest.Services.Identity.Models;
+using Worknest.Services.Identity.Services;
 
 namespace Worknest.Services.Identity.Controllers
 {
@@ -15,11 +16,13 @@ namespace Worknest.Services.Identity.Controllers
     {
         private readonly UserManager<User> _userManager;
         private readonly IConfiguration _configuration;
+        private readonly IEmailService _emailService;
 
-        public AuthController(UserManager<User> userManager, IConfiguration configuration)
+        public AuthController(UserManager<User> userManager, IConfiguration configuration, IEmailService emailService)
         {
             _userManager = userManager;
             _configuration = configuration;
+            _emailService = emailService;
         }
 
         // --- REGISTRATION ENDPOINT ---
@@ -87,6 +90,55 @@ namespace Worknest.Services.Identity.Controllers
                 Email = user.Email,
                 Username = user.UserName
             });
+        }
+
+        // --- FORGOT PASSWORD ENDPOINT ---
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto forgotPasswordDto)
+        {
+            // Always return success to prevent email enumeration attacks
+            var user = await _userManager.FindByEmailAsync(forgotPasswordDto.Email);
+            if (user == null)
+            {
+                // Return success even if user doesn't exist (security best practice)
+                return Ok(new { Message = "If an account with this email exists, a password reset link has been sent." });
+            }
+
+            // Generate password reset token
+            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+            // Send email with reset link
+            try
+            {
+                await _emailService.SendPasswordResetEmailAsync(user.Email!, resetToken);
+            }
+            catch (Exception)
+            {
+                // Log error internally but don't expose to user
+                return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Failed to send password reset email. Please try again later." });
+            }
+
+            return Ok(new { Message = "If an account with this email exists, a password reset link has been sent." });
+        }
+
+        // --- RESET PASSWORD ENDPOINT ---
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto resetPasswordDto)
+        {
+            var user = await _userManager.FindByEmailAsync(resetPasswordDto.Email);
+            if (user == null)
+            {
+                return BadRequest(new { Message = "Invalid password reset request." });
+            }
+
+            var result = await _userManager.ResetPasswordAsync(user, resetPasswordDto.Token, resetPasswordDto.NewPassword);
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(new { Message = "Password reset failed.", Errors = errors });
+            }
+
+            return Ok(new { Message = "Password has been reset successfully. You can now login with your new password." });
         }
 
         // --- TOKEN GENERATION HELPER ---
