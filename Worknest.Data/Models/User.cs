@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity; // <-- 1. ADD THIS
+﻿using Microsoft.AspNetCore.Identity; 
 using System.ComponentModel.DataAnnotations;
 using Worknest.Data.Models;
 
@@ -11,6 +11,7 @@ namespace Worknest.Data.Models
         // because IdentityUser already has them.
 
         public string? FullName { get; set; }
+        public string? JobTitle { get; set; }
 
         // --- Relationships ---
         public ICollection<SpaceMember> Spaces { get; set; } = new List<SpaceMember>();

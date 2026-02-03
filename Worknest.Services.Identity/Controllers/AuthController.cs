@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authorization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -25,59 +26,45 @@ namespace Worknest.Services.Identity.Controllers
             _emailService = emailService;
         }
 
-        // --- REGISTRATION ENDPOINT ---
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto registerDto)
         {
-            // 1. Check if user already exists
             var userExists = await _userManager.FindByEmailAsync(registerDto.Email);
             if (userExists != null)
             {
-                return StatusCode(StatusCodes.Status400BadRequest, new { Message = "User already exists with this email." });
+                return BadRequest(new { Message = "User already exists with this email." });
             }
 
-            // 2. Create the new user object
             User user = new()
             {
                 Email = registerDto.Email,
-                SecurityStamp = Guid.NewGuid().ToString(), // Required by Identity
+                SecurityStamp = Guid.NewGuid().ToString(),
                 UserName = registerDto.Username
             };
 
-            // 3. Create the user in the database (this hashes the password)
             var result = await _userManager.CreateAsync(user, registerDto.Password);
             if (!result.Succeeded)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "User creation failed.", Errors = result.Errors });
+                return StatusCode(500, new { Message = "User creation failed.", Errors = result.Errors });
             }
 
             return Ok(new { Message = "User created successfully!" });
         }
 
-        // --- LOGIN ENDPOINT ---
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
-            // 1. Check if user exists
             var user = await _userManager.FindByEmailAsync(loginDto.Email);
-            if (user == null)
+            if (user == null || !await _userManager.CheckPasswordAsync(user, loginDto.Password))
             {
                 return Unauthorized(new { Message = "Invalid email or password." });
             }
 
-            // 2. Check if password is correct
-            var isPasswordValid = await _userManager.CheckPasswordAsync(user, loginDto.Password);
-            if (!isPasswordValid)
-            {
-                return Unauthorized(new { Message = "Invalid email or password." });
-            }
-
-            // 3. Generate a JWT token
             var authClaims = new List<Claim>
             {
-                new Claim(ClaimTypes.Name, user.UserName),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), // This is the User ID
+                new Claim(ClaimTypes.Name, user.UserName ?? ""),
+                new Claim(ClaimTypes.Email, user.Email ?? ""),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
@@ -88,77 +75,88 @@ namespace Worknest.Services.Identity.Controllers
                 Token = authResponse.Token,
                 Expiration = authResponse.Expiration,
                 Email = user.Email,
-                Username = user.UserName
+                Username = user.UserName 
             });
         }
 
-        // --- FORGOT PASSWORD ENDPOINT ---
+        [HttpPut("/api/user/profile")]
+        [Authorize] 
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto model)
+        {
+            var email = User.FindFirstValue(ClaimTypes.Email);
+            if (string.IsNullOrEmpty(email)) return Unauthorized();
+
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null) return NotFound(new { Message = "User not found." });
+
+            // UPDATE: Map frontend 'Name' to 'UserName' (or 'FullName' if you have it)
+            user.UserName = model.Name;
+            
+            // UPDATE: Map JobTitle from the request body to the user model
+            user.JobTitle = model.JobTitle; 
+
+            var result = await _userManager.UpdateAsync(user);
+
+            if (!result.Succeeded)
+            {
+                return BadRequest(new { Message = "Profile update failed.", Errors = result.Errors });
+            }
+
+           
+            return Ok(new
+            {
+                name = user.UserName,
+                email = user.Email,
+                jobTitle = user.JobTitle 
+            });
+        }
+
         [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto forgotPasswordDto)
         {
-            // Always return success to prevent email enumeration attacks
             var user = await _userManager.FindByEmailAsync(forgotPasswordDto.Email);
-            if (user == null)
-            {
-                // Return success even if user doesn't exist (security best practice)
-                return Ok(new { Message = "If an account with this email exists, a password reset link has been sent." });
-            }
+            if (user == null) return Ok(new { Message = "Reset link sent if account exists." });
 
-            // Generate password reset token
             var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
-
-            // Send email with reset link
             try
             {
                 await _emailService.SendPasswordResetEmailAsync(user.Email!, resetToken);
             }
-            catch (Exception)
+            catch
             {
-                // Log error internally but don't expose to user
-                return StatusCode(StatusCodes.Status500InternalServerError, new { Message = "Failed to send password reset email. Please try again later." });
+                return StatusCode(500, new { Message = "Failed to send email." });
             }
 
-            return Ok(new { Message = "If an account with this email exists, a password reset link has been sent." });
+            return Ok(new { Message = "Reset link sent if account exists." });
         }
 
-        // --- RESET PASSWORD ENDPOINT ---
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto resetPasswordDto)
         {
             var user = await _userManager.FindByEmailAsync(resetPasswordDto.Email);
-            if (user == null)
-            {
-                return BadRequest(new { Message = "Invalid password reset request." });
-            }
+            if (user == null) return BadRequest(new { Message = "Invalid request." });
 
             var result = await _userManager.ResetPasswordAsync(user, resetPasswordDto.Token, resetPasswordDto.NewPassword);
             if (!result.Succeeded)
             {
-                var errors = result.Errors.Select(e => e.Description).ToList();
-                return BadRequest(new { Message = "Password reset failed.", Errors = errors });
+                return BadRequest(new { Message = "Reset failed.", Errors = result.Errors.Select(e => e.Description) });
             }
 
-            return Ok(new { Message = "Password has been reset successfully. You can now login with your new password." });
+            return Ok(new { Message = "Password reset successful." });
         }
 
-        // --- TOKEN GENERATION HELPER ---
         private (string Token, DateTime Expiration) GenerateJwtToken(IEnumerable<Claim> claims)
         {
             var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
-            var tokenValidityInMinutes = Convert.ToDouble(_configuration.GetValue<int>("Jwt:TokenValidityInMinutes", 60)); // Default to 60 mins
-
             var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
-                expires: DateTime.Now.AddMinutes(tokenValidityInMinutes),
+                expires: DateTime.Now.AddMinutes(Convert.ToDouble(_configuration["Jwt:TokenValidityInMinutes"] ?? "60")),
                 claims: claims,
                 signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
             );
 
-            return (
-                Token: new JwtSecurityTokenHandler().WriteToken(token),
-                Expiration: token.ValidTo
-            );
+            return (new JwtSecurityTokenHandler().WriteToken(token), token.ValidTo);
         }
     }
 }
