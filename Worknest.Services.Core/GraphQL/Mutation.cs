@@ -299,35 +299,55 @@ namespace Worknest.Services.Core.GraphQL
         }
 
         [Authorize]
-        public async Task<WorkItem> DeleteWorkItem(
-            Guid workItemId,
-            [Service] AppDbContext context,
-            ClaimsPrincipal claimsPrincipal)
+        public async Task<List<BoardColumn>> MoveBoardColumnLeft(
+    Guid columnId,
+    [Service] AppDbContext context)
         {
-            var userId = Guid.Parse(claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier));
-            var workItem = await context.WorkItems.FindAsync(workItemId);
+            var column = await context.BoardColumns.FindAsync(columnId);
+            if (column == null) throw new Exception("Column not found");
 
-            if (workItem == null) throw new HotChocolate.GraphQLException("Work item not found.");
+            var columns = await context.BoardColumns
+                .Where(c => c.SpaceId == column.SpaceId)
+                .OrderBy(c => c.Order)
+                .ToListAsync();
 
-            // Security check
-            var spaceKey = workItem.Key.Split('-').First();
-            var isMember = await context.SpaceMembers.AsNoTracking()
-                .AnyAsync(m => m.UserId == userId && m.Space.Key == spaceKey);
+            var index = columns.FindIndex(c => c.Id == columnId);
 
-            if (!isMember) throw new HotChocolate.GraphQLException(new Error("Not authorized.", "AUTH_NOT_MEMBER"));
+            if (index <= 0) return columns;
 
-            // Delete related comments first
-            var comments = await context.Comments.Where(c => c.WorkItemId == workItemId).ToListAsync();
-            context.Comments.RemoveRange(comments);
+            var leftColumn = columns[index - 1];
 
-            // Delete subtasks
-            var subtasks = await context.WorkItems.Where(w => w.ParentWorkItemId == workItemId).ToListAsync();
-            context.WorkItems.RemoveRange(subtasks);
+            (column.Order, leftColumn.Order) = (leftColumn.Order, column.Order);
 
-            context.WorkItems.Remove(workItem);
             await context.SaveChangesAsync();
 
-            return workItem;
+            return columns;
+        }
+
+        [Authorize]
+        public async Task<List<BoardColumn>> MoveBoardColumnRight(
+    Guid columnId,
+    [Service] AppDbContext context)
+        {
+            var column = await context.BoardColumns.FindAsync(columnId);
+            if (column == null) throw new Exception("Column not found");
+
+            var columns = await context.BoardColumns
+                .Where(c => c.SpaceId == column.SpaceId)
+                .OrderBy(c => c.Order)
+                .ToListAsync();
+
+            var index = columns.FindIndex(c => c.Id == columnId);
+
+            if (index >= columns.Count - 1) return columns;
+
+            var rightColumn = columns[index + 1];
+
+            (column.Order, rightColumn.Order) = (rightColumn.Order, column.Order);
+
+            await context.SaveChangesAsync();
+
+            return columns;
         }
 
         [Authorize]
