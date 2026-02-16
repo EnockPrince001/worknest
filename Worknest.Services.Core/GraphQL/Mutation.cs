@@ -292,6 +292,58 @@ namespace Worknest.Services.Core.GraphQL
         }
 
         [Authorize]
+        public async Task<List<BoardColumn>> MoveBoardColumnLeft(
+    Guid columnId,
+    [Service] AppDbContext context)
+        {
+            var column = await context.BoardColumns.FindAsync(columnId);
+            if (column == null) throw new Exception("Column not found");
+
+            var columns = await context.BoardColumns
+                .Where(c => c.SpaceId == column.SpaceId)
+                .OrderBy(c => c.Order)
+                .ToListAsync();
+
+            var index = columns.FindIndex(c => c.Id == columnId);
+
+            if (index <= 0) return columns;
+
+            var leftColumn = columns[index - 1];
+
+            (column.Order, leftColumn.Order) = (leftColumn.Order, column.Order);
+
+            await context.SaveChangesAsync();
+
+            return columns;
+        }
+
+        [Authorize]
+        public async Task<List<BoardColumn>> MoveBoardColumnRight(
+    Guid columnId,
+    [Service] AppDbContext context)
+        {
+            var column = await context.BoardColumns.FindAsync(columnId);
+            if (column == null) throw new Exception("Column not found");
+
+            var columns = await context.BoardColumns
+                .Where(c => c.SpaceId == column.SpaceId)
+                .OrderBy(c => c.Order)
+                .ToListAsync();
+
+            var index = columns.FindIndex(c => c.Id == columnId);
+
+            if (index >= columns.Count - 1) return columns;
+
+            var rightColumn = columns[index + 1];
+
+            (column.Order, rightColumn.Order) = (rightColumn.Order, column.Order);
+
+            await context.SaveChangesAsync();
+
+            return columns;
+        }
+
+        [Authorize]
         public async Task<WorkItem> CreateSubtask(
             Guid parentWorkItemId,
             CreateWorkItemInput input,
