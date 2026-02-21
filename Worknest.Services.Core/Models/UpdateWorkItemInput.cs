@@ -7,6 +7,7 @@ namespace Worknest.Services.Core.Models
         // All fields are optional (nullable)
         public string? Summary { get; set; }
         public Guid? SprintId { get; set; }
+        public bool? MoveToBacklog { get; set; } // Set to true to remove from sprint
         public Guid? AssigneeId { get; set; }
         public string? Description { get; set; }
         public WorkItemPriority? Priority { get; set; }

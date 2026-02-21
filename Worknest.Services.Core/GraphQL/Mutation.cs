@@ -267,7 +267,14 @@ namespace Worknest.Services.Core.GraphQL
 
             // --- Apply Updates ---
             if (input.Summary != null) workItem.Summary = input.Summary;
-            if (input.SprintId.HasValue) workItem.SprintId = input.SprintId.Value;
+            if (input.MoveToBacklog == true)
+            {
+                workItem.SprintId = null; // Move to backlog
+            }
+            else if (input.SprintId.HasValue)
+            {
+                workItem.SprintId = input.SprintId.Value;
+            }
             if (input.AssigneeId.HasValue) workItem.AssigneeId = input.AssigneeId.Value;
             if (input.Description != null) workItem.Description = input.Description;
             if (input.Priority.HasValue) workItem.Priority = input.Priority.Value;
