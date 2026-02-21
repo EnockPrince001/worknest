@@ -29,6 +29,8 @@ namespace Worknest.Data.Models
 
         public bool Flagged { get; set; }
 
+        public int Order { get; set; }
+
         // --- Relationships ---
 
         [Required]
