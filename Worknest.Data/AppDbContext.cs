@@ -6,26 +6,24 @@ using Worknest.Data.Models;
 
 namespace Worknest.Data
 {
-    
     public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-        // We can REMOVE the DbSet<User> because IdentityDbContext handles it.
-        // public DbSet<User> Users { get; set; } 
         public DbSet<Space> Spaces { get; set; }
         public DbSet<SpaceMember> SpaceMembers { get; set; }
         public DbSet<Sprint> Sprints { get; set; }
         public DbSet<WorkItem> WorkItems { get; set; }
         public DbSet<Comment> Comments { get; set; }
         public DbSet<BoardColumn> BoardColumns { get; set; }
+        // --- ADD THIS LINE ---
+        public DbSet<Activity> Activities { get; set; } 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // 4. ADD THIS LINE FIRST
-            base.OnModelCreating(modelBuilder); // This is ESSENTIAL for Identity tables
+            base.OnModelCreating(modelBuilder); 
 
-            // Configure the many-to-many relationship for Space <-> User
+            // SpaceMember configuration
             modelBuilder.Entity<SpaceMember>()
                 .HasKey(sm => new { sm.SpaceId, sm.UserId });
 
@@ -39,7 +37,7 @@ namespace Worknest.Data
                 .WithMany(u => u.Spaces)
                 .HasForeignKey(sm => sm.UserId);
 
-            // Configure the User -> WorkItem relationships (Reporter/Assignee)
+            // WorkItem (Reporter/Assignee)
             modelBuilder.Entity<WorkItem>()
                 .HasOne(wi => wi.Reporter)
                 .WithMany(u => u.ReportedWorkItems)
@@ -52,42 +50,53 @@ namespace Worknest.Data
                 .HasForeignKey(wi => wi.AssigneeId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            // Configure the WorkItem -> Subtasks self-referencing relationship
+            // WorkItem Subtasks
             modelBuilder.Entity<WorkItem>()
                 .HasOne(wi => wi.ParentWorkItem)
                 .WithMany(wi => wi.Subtasks)
                 .HasForeignKey(wi => wi.ParentWorkItemId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Configure the User -> Comment relationship
+            // Comments
             modelBuilder.Entity<Comment>()
                 .HasOne(c => c.Author)
                 .WithMany(u => u.Comments)
                 .HasForeignKey(c => c.AuthorId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Configure the Space -> Owner relationship
+            // --- ADD ACTIVITY CONFIGURATION ---
+            modelBuilder.Entity<Activity>()
+                .HasOne(a => a.WorkItem)
+                .WithMany() // or .WithMany(wi => wi.Activities) if you add the list to WorkItem model
+                .HasForeignKey(a => a.WorkItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Activity>()
+                .HasOne(a => a.Author)
+                .WithMany()
+                .HasForeignKey(a => a.AuthorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Space & Columns
             modelBuilder.Entity<Space>()
                 .HasOne(s => s.Owner)
                 .WithMany()
                 .HasForeignKey(s => s.OwnerId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Space -> BoardColumns
             modelBuilder.Entity<Space>()
                 .HasMany(s => s.BoardColumns)
                 .WithOne(c => c.Space)
                 .HasForeignKey(c => c.SpaceId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // WorkItem -> BoardColumn
             modelBuilder.Entity<WorkItem>()
                 .HasOne(wi => wi.BoardColumn)
                 .WithMany()
                 .HasForeignKey(wi => wi.BoardColumnId)
-                .OnDelete(DeleteBehavior.Restrict); // Don't delete column if it has tasks!
+                .OnDelete(DeleteBehavior.Restrict);
 
-            // Convert all Enums to strings in the database
+            // Enum Conversions
             modelBuilder.Entity<Space>().Property(s => s.Type).HasConversion<string>();
             modelBuilder.Entity<SpaceMember>().Property(sm => sm.Role).HasConversion<string>();
             modelBuilder.Entity<Sprint>().Property(s => s.Status).HasConversion<string>();

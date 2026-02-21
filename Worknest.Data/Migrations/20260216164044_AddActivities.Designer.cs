@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Worknest.Data;
 
@@ -11,9 +12,11 @@ using Worknest.Data;
 namespace Worknest.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260216164044_AddActivities")]
+    partial class AddActivities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -178,16 +181,11 @@ namespace Worknest.Data.Migrations
                     b.Property<Guid>("WorkItemId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("WorkItemId1")
-                        .HasColumnType("uniqueidentifier");
-
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorId");
 
                     b.HasIndex("WorkItemId");
-
-                    b.HasIndex("WorkItemId1");
 
                     b.ToTable("Activities");
                 });
@@ -532,10 +530,6 @@ namespace Worknest.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Worknest.Data.Models.WorkItem", null)
-                        .WithMany("Activities")
-                        .HasForeignKey("WorkItemId1");
-
                     b.Navigation("Author");
 
                     b.Navigation("WorkItem");
@@ -677,8 +671,6 @@ namespace Worknest.Data.Migrations
 
             modelBuilder.Entity("Worknest.Data.Models.WorkItem", b =>
                 {
-                    b.Navigation("Activities");
-
                     b.Navigation("Comments");
 
                     b.Navigation("Subtasks");

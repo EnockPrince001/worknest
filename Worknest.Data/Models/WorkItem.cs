@@ -58,5 +58,8 @@ namespace Worknest.Data.Models
 
         // A work item can have many comments
         public ICollection<Comment> Comments { get; set; } = new List<Comment>();
+        // Add this to the WorkItem class
+        public virtual ICollection<Activity> Activities { get; set; } = new List<Activity>();
+        
     }
 }
