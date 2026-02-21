@@ -301,20 +301,29 @@ namespace Worknest.Services.Core.GraphQL
 
             var columns = await context.BoardColumns
                 .Where(c => c.SpaceId == column.SpaceId)
-                .OrderBy(c => c.Order)
+                //.OrderBy(c => c.Order)
                 .ToListAsync();
+            columns = columns.OrderBy(c => c.Order).ThenBy(c => c.Id).ToList();
+
+            for (int i = 0; i < columns.Count; i++)
+            {
+                columns[i].Order = i;
+            }
 
             var index = columns.FindIndex(c => c.Id == columnId);
 
-            if (index <= 0) return columns;
+            //if (index <= 0) return columns;
+            if (index > 0)
+            {
 
-            var leftColumn = columns[index - 1];
+                var leftColumn = columns[index - 1];
 
-            (column.Order, leftColumn.Order) = (leftColumn.Order, column.Order);
-
+                (column.Order, leftColumn.Order) = (leftColumn.Order, column.Order);
+            }
             await context.SaveChangesAsync();
 
-            return columns;
+            //return columns;
+            return columns.OrderBy(c => c.Order).ToList();
         }
 
         [Authorize]
@@ -327,20 +336,80 @@ namespace Worknest.Services.Core.GraphQL
 
             var columns = await context.BoardColumns
                 .Where(c => c.SpaceId == column.SpaceId)
-                .OrderBy(c => c.Order)
+                //.OrderBy(c => c.Order)
+
                 .ToListAsync();
+            columns = columns.OrderBy(c => c.Order).ThenBy(c => c.Id).ToList();
+
+            for (int i = 0; i < columns.Count; i++)
+            {
+                columns[i].Order = i;
+            }
 
             var index = columns.FindIndex(c => c.Id == columnId);
 
-            if (index >= columns.Count - 1) return columns;
+            //if (index >= columns.Count - 1) return columns;
+            if (index < columns.Count - 1)
+            {
 
-            var rightColumn = columns[index + 1];
+                var rightColumn = columns[index + 1];
 
-            (column.Order, rightColumn.Order) = (rightColumn.Order, column.Order);
+                (column.Order, rightColumn.Order) = (rightColumn.Order, column.Order);
+            }
+            await context.SaveChangesAsync();
+
+            return columns.OrderBy( c => c.Order).ToList();
+        }
+        [Authorize]
+        public async Task<List<WorkItem>> MoveWorkItemUp(
+            Guid workItemId,
+            [Service] AppDbContext context)
+        {
+            var item = await context.WorkItems.FindAsync(workItemId);
+            if (item == null) throw new Exception("Work item not found");
+
+            var items = await context.WorkItems
+                .Where(w => w.BoardColumnId == item.BoardColumnId)
+                .OrderBy(w => w.Order)
+                .ThenBy(w => w.Id)
+                .ToListAsync();
+
+            var index = items.FindIndex(w => w.Id == workItemId);
+
+            if (index > 0)
+            {
+                var above = items[index - 1];
+                (item.Order, above.Order) = (above.Order, item.Order);
+            }
 
             await context.SaveChangesAsync();
 
-            return columns;
+            return items.OrderBy(w => w.Order).ToList();
+        }
+
+        [Authorize]
+        public async Task<List<WorkItem>> MoveWorkItemToTop(
+     Guid workItemId,
+     [Service] AppDbContext context)
+        {
+            var item = await context.WorkItems.FindAsync(workItemId);
+            if (item == null) throw new Exception("Work item not found");
+
+            var items = await context.WorkItems
+                .Where(w => w.BoardColumnId == item.BoardColumnId)
+                .OrderBy(w => w.Order)
+                .ThenBy(w => w.Id)
+                .ToListAsync();
+
+            items.Remove(item);
+            items.Insert(0, item);
+
+            for (int i = 0; i < items.Count; i++)
+                items[i].Order = i;
+
+            await context.SaveChangesAsync();
+
+            return items;
         }
 
         [Authorize]
