@@ -31,13 +31,33 @@ namespace Worknest.Services.Core.GraphQL
                 OwnerId = userId,
                 Owner = owner
             };
+            var existingCols = await context.BoardColumns
+     .Where(c => c.SpaceId == space.Id && c.IsSystem)
+     .ToListAsync();
 
-            var cols = new List<BoardColumn>
+            var cols = new List<BoardColumn>();
+
+            void EnsureColumn(string name, int order)
             {
-                new BoardColumn { Name = "TO DO", Order = 0, IsSystem = true, Space = space },
-                new BoardColumn { Name = "IN PROGRESS", Order = 1, IsSystem = true, Space = space },
-                new BoardColumn { Name = "DONE", Order = 2, IsSystem = true, Space = space }
-            };
+                if (!existingCols.Any(c => c.Name == name && c.SpaceId == space.Id))
+                {
+                    cols.Add(new BoardColumn
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = name,
+                        Order = order,
+                        IsSystem = true,
+                        SpaceId = space.Id   // <-- CRITICAL FIX
+                    });
+                }
+            }
+
+            EnsureColumn("TO DO", 0);
+            EnsureColumn("IN PROGRESS", 1);
+            EnsureColumn("DONE", 2);
+
+            if (cols.Count > 0)
+                await context.BoardColumns.AddRangeAsync(cols);
 
             await context.Spaces.AddAsync(space);
             await context.BoardColumns.AddRangeAsync(cols);
@@ -81,11 +101,24 @@ namespace Worknest.Services.Core.GraphQL
             ClaimsPrincipal claimsPrincipal)
         {
             var userId = Guid.Parse(claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier));
-            var space = await context.Spaces.Include(s => s.BoardColumns).FirstOrDefaultAsync(s => s.Id == input.SpaceId);
-            if (space == null) throw new GraphQLException("Space not found.");
 
-            var firstColumn = space.BoardColumns.OrderBy(c => c.Order).FirstOrDefault();
+            var space = await context.Spaces
+                .Include(s => s.BoardColumns)
+                .FirstOrDefaultAsync(s => s.Id == input.SpaceId);
+
+            if (space == null)
+                throw new GraphQLException("Space not found.");
+
+            var firstColumn = space.BoardColumns
+                .OrderBy(c => c.Order)
+                .First();
+
             var itemKey = await GetNextWorkItemKey(context, space.Id);
+
+            var maxOrder = await context.WorkItems
+                .Where(w => w.BoardColumnId == firstColumn.Id)
+                .Select(w => (int?)w.Order)
+                .MaxAsync() ?? -1;
 
             var workItem = new WorkItem
             {
@@ -97,6 +130,7 @@ namespace Worknest.Services.Core.GraphQL
                 Description = input.Description,
                 Priority = input.Priority ?? WorkItemPriority.MEDIUM,
                 BoardColumnId = firstColumn.Id,
+                Order = maxOrder + 1,
                 StoryPoints = input.StoryPoints,
                 ParentWorkItemId = input.ParentWorkItemId,
                 CreatedDate = DateTime.UtcNow,
@@ -105,6 +139,7 @@ namespace Worknest.Services.Core.GraphQL
 
             await context.WorkItems.AddAsync(workItem);
             await context.SaveChangesAsync();
+
             return workItem;
         }
 
