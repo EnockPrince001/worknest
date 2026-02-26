@@ -193,6 +193,21 @@ namespace Worknest.Services.Core.GraphQL
                 workItem.Priority = input.Priority.Value;
             }
 
+            if (input.StoryPoints.HasValue || (input.StoryPoints == null && workItem.StoryPoints != null)) {
+                LogChange("Story Points", workItem.StoryPoints?.ToString(), input.StoryPoints?.ToString());
+                workItem.StoryPoints = input.StoryPoints;
+            }
+
+            if (input.Flagged.HasValue) {
+                LogChange("Flagged", workItem.Flagged.ToString(), input.Flagged.Value.ToString());
+                workItem.Flagged = input.Flagged.Value;
+            }
+
+            if (input.DueDate.HasValue || (input.DueDate == null && workItem.DueDate != null)) {
+                LogChange("Due Date", workItem.DueDate?.ToString(), input.DueDate?.ToString());
+                workItem.DueDate = input.DueDate;
+            }
+
             workItem.UpdatedDate = DateTime.UtcNow;
             await context.SaveChangesAsync();
 
