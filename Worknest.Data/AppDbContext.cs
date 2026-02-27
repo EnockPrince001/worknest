@@ -67,7 +67,7 @@ namespace Worknest.Data
             // --- ADD ACTIVITY CONFIGURATION ---
             modelBuilder.Entity<Activity>()
                 .HasOne(a => a.WorkItem)
-                .WithMany() // or .WithMany(wi => wi.Activities) if you add the list to WorkItem model
+                .WithMany(wi => wi.Activities) 
                 .HasForeignKey(a => a.WorkItemId)
                 .OnDelete(DeleteBehavior.Cascade);
 

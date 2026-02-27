@@ -31,13 +31,33 @@ namespace Worknest.Services.Core.GraphQL
                 OwnerId = userId,
                 Owner = owner
             };
+            var existingCols = await context.BoardColumns
+     .Where(c => c.SpaceId == space.Id && c.IsSystem)
+     .ToListAsync();
 
-            var cols = new List<BoardColumn>
+            var cols = new List<BoardColumn>();
+
+            void EnsureColumn(string name, int order)
             {
-                new BoardColumn { Name = "TO DO", Order = 0, IsSystem = true, Space = space },
-                new BoardColumn { Name = "IN PROGRESS", Order = 1, IsSystem = true, Space = space },
-                new BoardColumn { Name = "DONE", Order = 2, IsSystem = true, Space = space }
-            };
+                if (!existingCols.Any(c => c.Name == name && c.SpaceId == space.Id))
+                {
+                    cols.Add(new BoardColumn
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = name,
+                        Order = order,
+                        IsSystem = true,
+                        SpaceId = space.Id   // <-- CRITICAL FIX
+                    });
+                }
+            }
+
+            EnsureColumn("TO DO", 0);
+            EnsureColumn("IN PROGRESS", 1);
+            EnsureColumn("DONE", 2);
+
+            if (cols.Count > 0)
+                await context.BoardColumns.AddRangeAsync(cols);
 
             await context.Spaces.AddAsync(space);
             await context.BoardColumns.AddRangeAsync(cols);
@@ -81,11 +101,24 @@ namespace Worknest.Services.Core.GraphQL
             ClaimsPrincipal claimsPrincipal)
         {
             var userId = Guid.Parse(claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier));
-            var space = await context.Spaces.Include(s => s.BoardColumns).FirstOrDefaultAsync(s => s.Id == input.SpaceId);
-            if (space == null) throw new GraphQLException("Space not found.");
 
-            var firstColumn = space.BoardColumns.OrderBy(c => c.Order).FirstOrDefault();
+            var space = await context.Spaces
+                .Include(s => s.BoardColumns)
+                .FirstOrDefaultAsync(s => s.Id == input.SpaceId);
+
+            if (space == null)
+                throw new GraphQLException("Space not found.");
+
+            var firstColumn = space.BoardColumns
+                .OrderBy(c => c.Order)
+                .First();
+
             var itemKey = await GetNextWorkItemKey(context, space.Id);
+
+            var maxOrder = await context.WorkItems
+                .Where(w => w.BoardColumnId == firstColumn.Id)
+                .Select(w => (int?)w.Order)
+                .MaxAsync() ?? -1;
 
             var workItem = new WorkItem
             {
@@ -97,6 +130,7 @@ namespace Worknest.Services.Core.GraphQL
                 Description = input.Description,
                 Priority = input.Priority ?? WorkItemPriority.MEDIUM,
                 BoardColumnId = firstColumn.Id,
+                Order = maxOrder + 1,
                 StoryPoints = input.StoryPoints,
                 ParentWorkItemId = input.ParentWorkItemId,
                 CreatedDate = DateTime.UtcNow,
@@ -105,6 +139,7 @@ namespace Worknest.Services.Core.GraphQL
 
             await context.WorkItems.AddAsync(workItem);
             await context.SaveChangesAsync();
+
             return workItem;
         }
 
@@ -132,30 +167,56 @@ namespace Worknest.Services.Core.GraphQL
                 });
             }
 
-            if (input.Summary != null) {
-                LogChange("Summary", workItem.Summary, input.Summary);
-                workItem.Summary = input.Summary;
+            if (input.Summary.HasValue) {
+                var newVal = input.Summary.Value;
+                LogChange("Summary", workItem.Summary, newVal);
+                workItem.Summary = newVal ?? string.Empty; // Summary is required in DB
             }
 
-            if (input.Description != null) {
-                LogChange("Description", workItem.Description, input.Description);
-                workItem.Description = input.Description;
+            if (input.Description.HasValue) {
+                var newVal = input.Description.Value;
+                LogChange("Description", workItem.Description, newVal);
+                workItem.Description = newVal;
             }
 
             if (input.BoardColumnId.HasValue) {
-                LogChange("Status", workItem.BoardColumnId.ToString(), input.BoardColumnId.Value.ToString());
-                workItem.BoardColumnId = input.BoardColumnId.Value;
+                var newVal = input.BoardColumnId.Value;
+                LogChange("Status", workItem.BoardColumnId?.ToString(), newVal?.ToString());
+                workItem.BoardColumnId = newVal;
             }
 
-            // Fix for Assignee (handling null/unassigned)
-            if (input.AssigneeId != workItem.AssigneeId) {
-                LogChange("Assignee", workItem.AssigneeId?.ToString(), input.AssigneeId?.ToString());
-                workItem.AssigneeId = input.AssigneeId;
+            if (input.AssigneeId.HasValue) {
+                var newVal = input.AssigneeId.Value;
+                LogChange("Assignee", workItem.AssigneeId?.ToString(), newVal?.ToString());
+                workItem.AssigneeId = newVal;
             }
 
             if (input.Priority.HasValue) {
-                LogChange("Priority", workItem.Priority.ToString(), input.Priority.Value.ToString());
-                workItem.Priority = input.Priority.Value;
+                var newVal = input.Priority.Value;
+                if (newVal.HasValue) {
+                    LogChange("Priority", workItem.Priority.ToString(), newVal.Value.ToString());
+                    workItem.Priority = newVal.Value;
+                }
+            }
+
+            if (input.StoryPoints.HasValue) {
+                var newVal = input.StoryPoints.Value;
+                LogChange("Story Points", workItem.StoryPoints?.ToString(), newVal?.ToString());
+                workItem.StoryPoints = newVal;
+            }
+
+            if (input.Flagged.HasValue) {
+                var newVal = input.Flagged.Value;
+                if (newVal.HasValue) {
+                    LogChange("Flagged", workItem.Flagged.ToString(), newVal.Value.ToString());
+                    workItem.Flagged = newVal.Value;
+                }
+            }
+
+            if (input.DueDate.HasValue) {
+                var newVal = input.DueDate.Value;
+                LogChange("Due Date", workItem.DueDate?.ToString(), newVal?.ToString());
+                workItem.DueDate = newVal;
             }
 
             workItem.UpdatedDate = DateTime.UtcNow;
