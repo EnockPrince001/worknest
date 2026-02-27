@@ -39,7 +39,8 @@ namespace Worknest.Services.Identity.Controllers
             {
                 Email = registerDto.Email,
                 SecurityStamp = Guid.NewGuid().ToString(),
-                UserName = registerDto.Username
+                UserName = registerDto.Username,
+                FullName = registerDto.Username  // Store username as FullName on register
             };
 
             var result = await _userManager.CreateAsync(user, registerDto.Password);
@@ -75,12 +76,13 @@ namespace Worknest.Services.Identity.Controllers
                 Token = authResponse.Token,
                 Expiration = authResponse.Expiration,
                 Email = user.Email,
-                Username = user.UserName 
+                Username = user.FullName ?? user.UserName,  // Return FullName, fallback to UserName
+                JobTitle = user.JobTitle
             });
         }
 
         [HttpPut("/api/user/profile")]
-        [Authorize] 
+        [Authorize]
         public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto model)
         {
             var email = User.FindFirstValue(ClaimTypes.Email);
@@ -89,11 +91,11 @@ namespace Worknest.Services.Identity.Controllers
             var user = await _userManager.FindByEmailAsync(email);
             if (user == null) return NotFound(new { Message = "User not found." });
 
-            // UPDATE: Map frontend 'Name' to 'UserName' (or 'FullName' if you have it)
-            user.UserName = model.Name;
-            
-            // UPDATE: Map JobTitle from the request body to the user model
-            user.JobTitle = model.JobTitle; 
+            // Update FullName (display name) - NOT UserName (login identifier)
+            user.FullName = model.Name;
+
+            // Update JobTitle
+            user.JobTitle = model.JobTitle;
 
             var result = await _userManager.UpdateAsync(user);
 
@@ -102,12 +104,11 @@ namespace Worknest.Services.Identity.Controllers
                 return BadRequest(new { Message = "Profile update failed.", Errors = result.Errors });
             }
 
-           
             return Ok(new
             {
-                name = user.UserName,
+                name = user.FullName ?? user.UserName,
                 email = user.Email,
-                jobTitle = user.JobTitle 
+                jobTitle = user.JobTitle
             });
         }
 
