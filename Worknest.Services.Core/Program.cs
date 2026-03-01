@@ -95,4 +95,6 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+app.MapGraphQL();
+
 app.Run();
