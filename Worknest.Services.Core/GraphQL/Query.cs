@@ -65,29 +65,6 @@ namespace Worknest.Services.Core.GraphQL
         }
 
         [Authorize]
-        public IQueryable<BoardColumn> GetBoardColumnsBySpaceId(
-            Guid spaceId,
-            [Service] AppDbContext context,
-            ClaimsPrincipal claimsPrincipal)
-        {
-            var userIdString = claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);
-            var userId = Guid.Parse(userIdString);
-
-            // Ensure the user is a member of the space
-            var isMember = context.SpaceMembers
-                .Any(m => m.UserId == userId && m.SpaceId == spaceId);
-
-            if (!isMember)
-            {
-                return Enumerable.Empty<BoardColumn>().AsQueryable();
-            }
-
-            return context.BoardColumns
-                .Where(bc => bc.SpaceId == spaceId)
-                .OrderBy(bc => bc.Order);
-        }
-
-        [Authorize]
         [UseProjection]
         [UseFiltering]
         [UseSorting]
