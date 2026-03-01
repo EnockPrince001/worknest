@@ -140,6 +140,7 @@ namespace Worknest.Services.Core.GraphQL
                 SprintId = input.SprintId,
                 AssigneeId = input.AssigneeId,
                 Description = input.Description,
+                Type = input.Type ?? WorkItemType.TASK,
                 Priority = input.Priority ?? WorkItemPriority.MEDIUM,
                 BoardColumnId = targetColumnId,
                 Order = maxOrder + 1,

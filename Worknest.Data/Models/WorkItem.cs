@@ -16,6 +16,8 @@ namespace Worknest.Data.Models
         public string Summary { get; set; }
 
         public string? Description { get; set; }
+        
+        public WorkItemType Type { get; set; }
 
        public WorkItemPriority Priority { get; set; }
 
