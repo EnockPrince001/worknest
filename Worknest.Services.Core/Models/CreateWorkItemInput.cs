@@ -18,5 +18,6 @@ namespace Worknest.Services.Core.Models
         public WorkItemPriority? Priority { get; set; } = WorkItemPriority.MEDIUM;
         public int? StoryPoints { get; set; }
         public Guid? ParentWorkItemId { get; set; } // For subtasks
+        public Guid? BoardColumnId { get; set; } // Initial column
     }
 }

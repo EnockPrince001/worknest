@@ -125,8 +125,10 @@ namespace Worknest.Services.Core.GraphQL
 
             var itemKey = await GetNextWorkItemKey(context, space.Id);
 
+            var targetColumnId = input.BoardColumnId ?? firstColumn.Id;
+
             var maxOrder = await context.WorkItems
-                .Where(w => w.BoardColumnId == firstColumn.Id)
+                .Where(w => w.BoardColumnId == targetColumnId)
                 .Select(w => (int?)w.Order)
                 .MaxAsync() ?? -1;
 
@@ -139,7 +141,7 @@ namespace Worknest.Services.Core.GraphQL
                 AssigneeId = input.AssigneeId,
                 Description = input.Description,
                 Priority = input.Priority ?? WorkItemPriority.MEDIUM,
-                BoardColumnId = firstColumn.Id,
+                BoardColumnId = targetColumnId,
                 Order = maxOrder + 1,
                 StoryPoints = input.StoryPoints,
                 ParentWorkItemId = input.ParentWorkItemId,
