@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Worknest.Data;
 
@@ -11,9 +12,11 @@ using Worknest.Data;
 namespace Worknest.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260301082103_ApplyPendingChanges")]
+    partial class ApplyPendingChanges
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -417,9 +420,6 @@ namespace Worknest.Data.Migrations
                     b.Property<DateTime?>("DueDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("EpicId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<bool>("Flagged")
                         .HasColumnType("bit");
 
@@ -438,9 +438,6 @@ namespace Worknest.Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("ReporterId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("SpaceId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("SprintId")
@@ -462,13 +459,9 @@ namespace Worknest.Data.Migrations
 
                     b.HasIndex("BoardColumnId");
 
-                    b.HasIndex("EpicId");
-
                     b.HasIndex("ParentWorkItemId");
 
                     b.HasIndex("ReporterId");
-
-                    b.HasIndex("SpaceId");
 
                     b.HasIndex("SprintId");
 
@@ -628,10 +621,6 @@ namespace Worknest.Data.Migrations
                         .HasForeignKey("BoardColumnId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Worknest.Data.Models.WorkItem", "Epic")
-                        .WithMany()
-                        .HasForeignKey("EpicId");
-
                     b.HasOne("Worknest.Data.Models.WorkItem", "ParentWorkItem")
                         .WithMany("Subtasks")
                         .HasForeignKey("ParentWorkItemId")
@@ -643,10 +632,6 @@ namespace Worknest.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Worknest.Data.Models.Space", "Space")
-                        .WithMany()
-                        .HasForeignKey("SpaceId");
-
                     b.HasOne("Worknest.Data.Models.Sprint", "Sprint")
                         .WithMany("WorkItems")
                         .HasForeignKey("SprintId");
@@ -655,13 +640,9 @@ namespace Worknest.Data.Migrations
 
                     b.Navigation("BoardColumn");
 
-                    b.Navigation("Epic");
-
                     b.Navigation("ParentWorkItem");
 
                     b.Navigation("Reporter");
-
-                    b.Navigation("Space");
 
                     b.Navigation("Sprint");
                 });

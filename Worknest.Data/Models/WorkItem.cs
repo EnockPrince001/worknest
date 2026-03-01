@@ -62,6 +62,14 @@ namespace Worknest.Data.Models
         public ICollection<Comment> Comments { get; set; } = new List<Comment>();
         // Add this to the WorkItem class
         public virtual ICollection<Activity> Activities { get; set; } = new List<Activity>();
+
+        public Guid? SpaceId { get; set; }
+        [ForeignKey("SpaceId")]
+        public Space? Space { get; set; }
+
+        public Guid? EpicId { get; set; }
+        [ForeignKey("EpicId")]
+        public WorkItem? Epic { get; set; }
         
     }
 }

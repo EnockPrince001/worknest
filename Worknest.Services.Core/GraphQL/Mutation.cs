@@ -11,6 +11,13 @@ namespace Worknest.Services.Core.GraphQL
 {
     public class Mutation
     {
+        private Guid GetUserId(ClaimsPrincipal principal)
+        {
+            var userIdStr = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userIdStr)) throw new GraphQLException("User not authenticated.");
+            return Guid.Parse(userIdStr);
+        }
+
         // --- SPACE MANAGEMENT ---
 
         [Authorize]
@@ -19,7 +26,7 @@ namespace Worknest.Services.Core.GraphQL
             [Service] AppDbContext context,
             ClaimsPrincipal claimsPrincipal)
         {
-            var userId = Guid.Parse(claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier));
+            var userId = GetUserId(claimsPrincipal);
             var owner = await context.Users.FindAsync(userId);
             if (owner == null) throw new Exception("User not found");
 
@@ -75,7 +82,7 @@ namespace Worknest.Services.Core.GraphQL
             [Service] AppDbContext context,
             ClaimsPrincipal claimsPrincipal)
         {
-            var inviterId = Guid.Parse(claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier));
+            var inviterId = GetUserId(claimsPrincipal);
             var inviterMembership = await context.SpaceMembers.AsNoTracking()
                 .FirstOrDefaultAsync(m => m.SpaceId == input.SpaceId && m.UserId == inviterId);
 
@@ -100,7 +107,7 @@ namespace Worknest.Services.Core.GraphQL
             [Service] AppDbContext context,
             ClaimsPrincipal claimsPrincipal)
         {
-            var userId = Guid.Parse(claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier));
+            var userId = GetUserId(claimsPrincipal);
 
             var space = await context.Spaces
                 .Include(s => s.BoardColumns)
@@ -111,7 +118,10 @@ namespace Worknest.Services.Core.GraphQL
 
             var firstColumn = space.BoardColumns
                 .OrderBy(c => c.Order)
-                .First();
+                .FirstOrDefault();
+
+            if (firstColumn == null)
+                throw new GraphQLException("Space has no columns.");
 
             var itemKey = await GetNextWorkItemKey(context, space.Id);
 
@@ -133,6 +143,7 @@ namespace Worknest.Services.Core.GraphQL
                 Order = maxOrder + 1,
                 StoryPoints = input.StoryPoints,
                 ParentWorkItemId = input.ParentWorkItemId,
+                SpaceId = space.Id,
                 CreatedDate = DateTime.UtcNow,
                 UpdatedDate = DateTime.UtcNow
             };
@@ -150,7 +161,7 @@ namespace Worknest.Services.Core.GraphQL
             [Service] AppDbContext context,
             ClaimsPrincipal claimsPrincipal)
         {
-            var userId = Guid.Parse(claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier));
+            var userId = GetUserId(claimsPrincipal);
             var workItem = await context.WorkItems.FindAsync(workItemId);
             if (workItem == null) throw new GraphQLException("Work item not found.");
 
@@ -183,6 +194,17 @@ namespace Worknest.Services.Core.GraphQL
                 var newVal = input.BoardColumnId.Value;
                 LogChange("Status", workItem.BoardColumnId?.ToString(), newVal?.ToString());
                 workItem.BoardColumnId = newVal;
+            }
+
+            if (input.SprintId.HasValue) {
+                var newVal = input.SprintId.Value;
+                LogChange("Sprint", workItem.SprintId?.ToString(), newVal?.ToString());
+                workItem.SprintId = newVal;
+            }
+
+            if (input.MoveToBacklog.HasValue && input.MoveToBacklog.Value == true) {
+                LogChange("Sprint", workItem.SprintId?.ToString(), "Backlog");
+                workItem.SprintId = null;
             }
 
             if (input.AssigneeId.HasValue) {
@@ -298,6 +320,71 @@ namespace Worknest.Services.Core.GraphQL
 
             return columns.OrderBy( c => c.Order).ToList();
         }
+
+        [Authorize]
+        public async Task<BoardColumn> AddBoardColumn(
+            string name,
+            Guid spaceId,
+            [Service] AppDbContext context)
+        {
+            var maxOrder = await context.BoardColumns
+                .Where(c => c.SpaceId == spaceId)
+                .Select(c => (int?)c.Order)
+                .MaxAsync() ?? -1;
+
+            var column = new BoardColumn
+            {
+                Name = name,
+                SpaceId = spaceId,
+                Order = maxOrder + 1,
+                IsSystem = false
+            };
+
+            await context.BoardColumns.AddAsync(column);
+            await context.SaveChangesAsync();
+            return column;
+        }
+
+        [Authorize]
+        public async Task<bool> DeleteBoardColumn(
+            Guid columnId,
+            Guid targetColumnId,
+            [Service] AppDbContext context)
+        {
+            var column = await context.BoardColumns.FindAsync(columnId);
+            if (column == null) throw new GraphQLException("Column not found.");
+            if (column.IsSystem) throw new GraphQLException("Cannot delete system columns.");
+
+            var targetColumn = await context.BoardColumns.FindAsync(targetColumnId);
+            if (targetColumn == null) throw new GraphQLException("Target column not found.");
+
+            // Move items
+            var itemsToMove = await context.WorkItems
+                .Where(wi => wi.BoardColumnId == columnId)
+                .ToListAsync();
+
+            foreach (var item in itemsToMove)
+            {
+                item.BoardColumnId = targetColumnId;
+            }
+
+            context.BoardColumns.Remove(column);
+            await context.SaveChangesAsync();
+
+            // Re-order remaining columns
+            var columns = await context.BoardColumns
+                .Where(c => c.SpaceId == column.SpaceId)
+                .OrderBy(c => c.Order)
+                .ToListAsync();
+
+            for (int i = 0; i < columns.Count; i++)
+            {
+                columns[i].Order = i;
+            }
+
+            await context.SaveChangesAsync();
+            return true;
+        }
         [Authorize]
         public async Task<List<WorkItem>> MoveWorkItemUp(
             Guid workItemId,
@@ -343,11 +430,103 @@ namespace Worknest.Services.Core.GraphQL
             items.Insert(0, item);
 
             for (int i = 0; i < items.Count; i++)
-                items[i].Order = i;
+            {
+                var workItemToUpdate = items[i];
+                if (workItemToUpdate != null)
+                {
+                    workItemToUpdate.Order = i;
+                }
+            }
 
             await context.SaveChangesAsync();
 
             return items;
+        }
+
+        // --- SPRINT MANAGEMENT ---
+
+        [Authorize]
+        public async Task<Sprint> CreateSprint(
+            CreateSprintInput input,
+            [Service] AppDbContext context)
+        {
+            var sprint = new Sprint
+            {
+                Name = input.Name,
+                SpaceId = input.SpaceId,
+                Goal = input.Goal,
+                StartDate = input.StartDate,
+                EndDate = input.EndDate,
+                Duration = input.Duration,
+                Status = SprintStatus.PLANNED
+            };
+
+            await context.Sprints.AddAsync(sprint);
+            await context.SaveChangesAsync();
+            return sprint;
+        }
+
+        [Authorize]
+        public async Task<Sprint> UpdateSprint(
+            Guid sprintId,
+            UpdateSprintInput input,
+            [Service] AppDbContext context)
+        {
+            var sprint = await context.Sprints.FindAsync(sprintId);
+            if (sprint == null) throw new GraphQLException("Sprint not found.");
+
+            if (input.Name.HasValue) sprint.Name = input.Name.Value ?? sprint.Name;
+            if (input.Goal.HasValue) sprint.Goal = input.Goal.Value;
+            if (input.StartDate.HasValue) sprint.StartDate = input.StartDate.Value;
+            if (input.EndDate.HasValue) sprint.EndDate = input.EndDate.Value;
+            if (input.Duration.HasValue) sprint.Duration = input.Duration.Value;
+            if (input.Status.HasValue && input.Status.Value.HasValue) sprint.Status = input.Status.Value.Value;
+
+            await context.SaveChangesAsync();
+            return sprint;
+        }
+
+        [Authorize]
+        public async Task<Sprint> DeleteSprint(
+            Guid sprintId,
+            [Service] AppDbContext context)
+        {
+            var sprint = await context.Sprints.FindAsync(sprintId);
+            if (sprint == null) throw new GraphQLException("Sprint not found.");
+
+            context.Sprints.Remove(sprint);
+            await context.SaveChangesAsync();
+            return sprint;
+        }
+
+        [Authorize]
+        public async Task<Sprint> StartSprint(
+            Guid sprintId,
+            [Service] AppDbContext context)
+        {
+            var sprint = await context.Sprints.FindAsync(sprintId);
+            if (sprint == null) throw new GraphQLException("Sprint not found.");
+
+            sprint.Status = SprintStatus.ACTIVE;
+            sprint.StartDate = DateTime.UtcNow;
+
+            await context.SaveChangesAsync();
+            return sprint;
+        }
+
+        [Authorize]
+        public async Task<Sprint> CompleteSprint(
+            Guid sprintId,
+            [Service] AppDbContext context)
+        {
+            var sprint = await context.Sprints.FindAsync(sprintId);
+            if (sprint == null) throw new GraphQLException("Sprint not found.");
+
+            sprint.Status = SprintStatus.COMPLETED;
+            sprint.EndDate = DateTime.UtcNow;
+
+            await context.SaveChangesAsync();
+            return sprint;
         }
 
         // --- SUBTASK & SPRINT HELPERS ---
@@ -359,19 +538,24 @@ namespace Worknest.Services.Core.GraphQL
             [Service] AppDbContext context,
             ClaimsPrincipal claimsPrincipal)
         {
-            var userId = Guid.Parse(claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier));
+            var userId = GetUserId(claimsPrincipal);
             var parentItem = await context.WorkItems.FindAsync(parentWorkItemId);
             if (parentItem == null) throw new GraphQLException("Parent not found.");
 
             var spaceKey = parentItem.Key.Split('-')[0];
             var space = await context.Spaces.Include(s => s.BoardColumns).FirstOrDefaultAsync(s => s.Key == spaceKey);
+            if (space == null) throw new GraphQLException("Space associated with parent item not found.");
+
+            var firstColumn = space.BoardColumns.OrderBy(c => c.Order).FirstOrDefault();
+            if (firstColumn == null) throw new GraphQLException("Space has no columns.");
 
             var subtask = new WorkItem {
                 Summary = input.Summary,
                 Key = $"{space.Key}-{await GetNextWorkItemKey(context, space.Id)}",
                 ReporterId = userId,
                 ParentWorkItemId = parentWorkItemId,
-                BoardColumnId = space.BoardColumns.OrderBy(c => c.Order).First().Id,
+                BoardColumnId = firstColumn.Id,
+                SpaceId = space.Id,
                 CreatedDate = DateTime.UtcNow,
                 UpdatedDate = DateTime.UtcNow
             };
