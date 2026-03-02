@@ -16,7 +16,7 @@ namespace Worknest.Data
         public DbSet<WorkItem> WorkItems { get; set; }
         public DbSet<Comment> Comments { get; set; }
         public DbSet<BoardColumn> BoardColumns { get; set; }
-        // --- ADD THIS LINE ---
+        
         public DbSet<Activity> Activities { get; set; } 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
