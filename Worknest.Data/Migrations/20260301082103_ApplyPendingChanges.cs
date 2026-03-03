@@ -11,17 +11,7 @@ namespace Worknest.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK_Activities_WorkItems_WorkItemId1",
-                table: "Activities");
-
-            migrationBuilder.DropIndex(
-                name: "IX_Activities_WorkItemId1",
-                table: "Activities");
-
-            migrationBuilder.DropColumn(
-                name: "WorkItemId1",
-                table: "Activities");
+            // Constraint did not exist in DB - skipped
         }
 
         /// <inheritdoc />
