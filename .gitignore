@@ -14,3 +14,6 @@ obj/
 
 # Flyway CLI (downloaded binary - do not commit)
 flyway_cli/
+
+# Dolt database (versioned via DoltHub, not GitHub)
+DoltDB/
