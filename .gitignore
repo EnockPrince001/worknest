@@ -11,3 +11,6 @@ obj/
 *.sln.docstates
 *.db
 *.lock.json
+
+# Flyway CLI (downloaded binary - do not commit)
+flyway_cli/
