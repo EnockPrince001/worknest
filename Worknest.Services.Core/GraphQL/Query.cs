@@ -88,8 +88,22 @@ namespace Worknest.Services.Core.GraphQL
             return context.WorkItems
                 .Include(wi => wi.Reporter)
                 .Include(wi => wi.Assignee)
+                .Include(wi => wi.Comments) // ✅ ADD THIS LINE
                 .Where(wi => wi.Key.StartsWith(spaceKey + "-"));
         }
+
+        [Authorize]
+        [UseProjection]
+        [UseFiltering]
+        [UseSorting]
+        public IQueryable<WorkItemComment> GetWorkItemComments(
+    Guid workItemId,
+    [Service] AppDbContext context)
+        {
+            return context.WorkItemComments
+                .Where(c => c.WorkItemId == workItemId);
+        }
+
 
         [Authorize]
         [UseProjection] 
@@ -103,7 +117,7 @@ namespace Worknest.Services.Core.GraphQL
                 .Include(wi => wi.Assignee)
                 .Include(wi => wi.BoardColumn)
                 .Include(wi => wi.Comments)
-                    .ThenInclude(c => c.Author)
+                    
                 .Include(wi => wi.Activities)  // Populates the History tab
                     .ThenInclude(a => a.Author)
                 .Where(wi => wi.Id == id);

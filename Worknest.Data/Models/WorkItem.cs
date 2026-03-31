@@ -61,7 +61,7 @@ namespace Worknest.Data.Models
         public ICollection<WorkItem> Subtasks { get; set; } = new List<WorkItem>();
 
         // A work item can have many comments
-        public ICollection<Comment> Comments { get; set; } = new List<Comment>();
+        public ICollection<WorkItemComment> Comments { get; set; } = new List<WorkItemComment>();
         // Add this to the WorkItem class
         public virtual ICollection<Activity> Activities { get; set; } = new List<Activity>();
 

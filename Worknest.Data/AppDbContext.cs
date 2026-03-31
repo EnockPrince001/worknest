@@ -14,6 +14,7 @@ namespace Worknest.Data
         public DbSet<SpaceMember> SpaceMembers { get; set; }
         public DbSet<Sprint> Sprints { get; set; }
         public DbSet<WorkItem> WorkItems { get; set; }
+        public DbSet<WorkItemComment> WorkItemComments { get; set; }
         public DbSet<Comment> Comments { get; set; }
         public DbSet<BoardColumn> BoardColumns { get; set; }
         // --- ADD THIS LINE ---

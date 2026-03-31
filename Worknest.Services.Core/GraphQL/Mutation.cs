@@ -349,6 +349,63 @@ namespace Worknest.Services.Core.GraphQL
         }
 
         [Authorize]
+        public async Task<WorkItemComment> AddWorkItemComment(
+            Guid workItemId,
+            string commentText,
+            [Service] AppDbContext context)
+        {
+            var comment = new WorkItemComment
+            {
+                Id = Guid.NewGuid(),
+                WorkItemId = workItemId,
+                CommentText = commentText,
+                CreatedBy = null, // later we will link logged-in user
+                CreatedAt = DateTime.UtcNow
+            };
+
+            context.WorkItemComments.Add(comment);
+
+            await context.SaveChangesAsync();
+
+            return comment;
+        }
+
+        [Authorize]
+        public async Task<WorkItemComment> UpdateWorkItemComment(
+    Guid commentId,
+    string commentText,
+    [Service] AppDbContext context)
+        {
+            var comment = await context.WorkItemComments.FindAsync(commentId);
+
+            if (comment == null)
+                throw new GraphQLException("Comment not found.");
+
+            comment.CommentText = commentText;
+
+            await context.SaveChangesAsync();
+
+            return comment;
+        }
+
+        [Authorize]
+        public async Task<bool> DeleteWorkItemComment(
+            Guid commentId,
+            [Service] AppDbContext context)
+        {
+            var comment = await context.WorkItemComments.FindAsync(commentId);
+
+            if (comment == null)
+                throw new GraphQLException("Comment not found.");
+
+            context.WorkItemComments.Remove(comment);
+
+            await context.SaveChangesAsync();
+
+            return true;
+        }
+
+        [Authorize]
         public async Task<bool> DeleteBoardColumn(
             Guid columnId,
             Guid targetColumnId,
@@ -388,6 +445,7 @@ namespace Worknest.Services.Core.GraphQL
             await context.SaveChangesAsync();
             return true;
         }
+
         [Authorize]
         public async Task<List<WorkItem>> MoveWorkItemUp(
             Guid workItemId,
@@ -413,6 +471,23 @@ namespace Worknest.Services.Core.GraphQL
             await context.SaveChangesAsync();
 
             return items.OrderBy(w => w.Order).ToList();
+        }
+
+        [Authorize]
+        public async Task<bool> DeleteWorkItem(
+    Guid workItemId,
+    [Service] AppDbContext context)
+        {
+            var workItem = await context.WorkItems.FindAsync(workItemId);
+
+            if (workItem == null)
+                throw new GraphQLException("Work item not found.");
+
+            context.WorkItems.Remove(workItem);
+
+            await context.SaveChangesAsync();
+
+            return true;
         }
 
         [Authorize]
