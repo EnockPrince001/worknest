@@ -31,6 +31,10 @@ namespace Worknest.Data.Models
 
         public bool Flagged { get; set; }
 
+        // ✅ ADD THESE TWO LINES HERE
+        public bool IsCompleted { get; set; } = false;
+        public DateTime? CompletedAt { get; set; }
+
         public int Order { get; set; }
 
         // --- Relationships ---

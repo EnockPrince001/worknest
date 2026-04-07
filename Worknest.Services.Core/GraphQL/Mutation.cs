@@ -193,10 +193,28 @@ namespace Worknest.Services.Core.GraphQL
                 workItem.Description = newVal;
             }
 
-            if (input.BoardColumnId.HasValue) {
+            if (input.BoardColumnId.HasValue)
+            {
                 var newVal = input.BoardColumnId.Value;
+
+                // Get the column being moved to
+                var column = await context.BoardColumns.FindAsync(newVal);
+
                 LogChange("Status", workItem.BoardColumnId?.ToString(), newVal?.ToString());
+
                 workItem.BoardColumnId = newVal;
+
+                // ✅ NEW LOGIC: Auto mark as completed if moved to DONE
+                if (column != null && column.Name.ToUpper() == "DONE")
+                {
+                    workItem.IsCompleted = true;
+                    workItem.CompletedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    workItem.IsCompleted = false;
+                    workItem.CompletedAt = null;
+                }
             }
 
             if (input.SprintId.HasValue) {
@@ -403,6 +421,56 @@ namespace Worknest.Services.Core.GraphQL
             await context.SaveChangesAsync();
 
             return true;
+        }
+
+        [Authorize]
+        public async Task<List<WorkItem>> MoveWorkItem(
+    Guid workItemId,
+    Guid targetColumnId,
+    int targetIndex,
+    [Service] AppDbContext context)
+        {
+            var item = await context.WorkItems.FindAsync(workItemId);
+            if (item == null)
+                throw new GraphQLException("Work item not found");
+
+            // 🔹 Get ALL items in target column
+            var targetItems = await context.WorkItems
+                .Where(w => w.BoardColumnId == targetColumnId && w.Id != workItemId)
+                .OrderBy(w => w.Order)
+                .ThenBy(w => w.Id)
+                .ToListAsync();
+
+            // 🔹 Remove item from old column list
+            var sourceItems = await context.WorkItems
+                .Where(w => w.BoardColumnId == item.BoardColumnId && w.Id != workItemId)
+                .OrderBy(w => w.Order)
+                .ToListAsync();
+
+            // 🔹 Reorder source column
+            for (int i = 0; i < sourceItems.Count; i++)
+            {
+                sourceItems[i].Order = i;
+            }
+
+            // 🔹 Move item to new column
+            item.BoardColumnId = targetColumnId;
+
+            // 🔹 Insert into target position
+            if (targetIndex < 0) targetIndex = 0;
+            if (targetIndex > targetItems.Count) targetIndex = targetItems.Count;
+
+            targetItems.Insert(targetIndex, item);
+
+            // 🔹 Reorder target column
+            for (int i = 0; i < targetItems.Count; i++)
+            {
+                targetItems[i].Order = i;
+            }
+
+            await context.SaveChangesAsync();
+
+            return targetItems;
         }
 
         [Authorize]
