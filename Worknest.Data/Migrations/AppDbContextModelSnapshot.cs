@@ -249,7 +249,7 @@ namespace Worknest.Data.Migrations
 
                     b.Property<string>("Key")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -263,6 +263,9 @@ namespace Worknest.Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
 
                     b.HasIndex("OwnerId");
 
@@ -431,7 +434,7 @@ namespace Worknest.Data.Migrations
 
                     b.Property<string>("Key")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("Order")
                         .HasColumnType("int");
@@ -473,6 +476,9 @@ namespace Worknest.Data.Migrations
 
                     b.HasIndex("EpicId");
 
+                    b.HasIndex("Key")
+                        .IsUnique();
+
                     b.HasIndex("ParentWorkItemId");
 
                     b.HasIndex("ReporterId");
@@ -504,6 +510,8 @@ namespace Worknest.Data.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedBy");
 
                     b.HasIndex("WorkItemId");
 
@@ -703,11 +711,20 @@ namespace Worknest.Data.Migrations
 
             modelBuilder.Entity("Worknest.Data.Models.WorkItemComment", b =>
                 {
-                    b.HasOne("Worknest.Data.Models.WorkItem", null)
+                    b.HasOne("Worknest.Data.Models.User", "Author")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Worknest.Data.Models.WorkItem", "WorkItem")
                         .WithMany("Comments")
                         .HasForeignKey("WorkItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Author");
+
+                    b.Navigation("WorkItem");
                 });
 
             modelBuilder.Entity("Worknest.Data.Models.Space", b =>

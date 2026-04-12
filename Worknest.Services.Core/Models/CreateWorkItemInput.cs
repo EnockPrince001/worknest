@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using Worknest.Data.Enums;
 
 namespace Worknest.Services.Core.Models
@@ -6,7 +6,7 @@ namespace Worknest.Services.Core.Models
     public class CreateWorkItemInput
     {
         [Required]
-        public string Summary { get; set; }
+        public string Summary { get; set; } = default!;
 
         [Required]
         public Guid SpaceId { get; set; } // Which space this item belongs to

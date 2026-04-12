@@ -1,4 +1,4 @@
-﻿using HotChocolate;
+using HotChocolate;
 using HotChocolate.Authorization;
 using HotChocolate.Data;
 using Microsoft.EntityFrameworkCore;
@@ -42,7 +42,7 @@ namespace Worknest.Services.Core.GraphQL
             ClaimsPrincipal claimsPrincipal)
         {
             var userIdString = claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);
-            var userId = Guid.Parse(userIdString);
+            var userId = Guid.Parse(userIdString!);
 
             return context.Spaces
                 .Where(s => s.Key == spaceKey)
@@ -57,7 +57,7 @@ namespace Worknest.Services.Core.GraphQL
             ClaimsPrincipal claimsPrincipal)
         {
             var userIdString = claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);
-            var userId = Guid.Parse(userIdString);
+            var userId = Guid.Parse(userIdString!);
 
             return context.Spaces
                 .Where(s => s.Key == spaceKey)
@@ -74,12 +74,14 @@ namespace Worknest.Services.Core.GraphQL
             ClaimsPrincipal claimsPrincipal)
         {
             var userIdString = claimsPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);
-            var userId = Guid.Parse(userIdString);
+            var userId = Guid.Parse(userIdString!);
 
-            var isMember = context.SpaceMembers
-                .Any(m => m.User.Id == userId && m.Space.Key == spaceKey);
+            var spaceId = context.Spaces
+                .Where(s => s.Key == spaceKey && s.Members.Any(m => m.UserId == userId))
+                .Select(s => (Guid?)s.Id)
+                .FirstOrDefault();
 
-            if (!isMember)
+            if (spaceId == null)
             {
                 return Enumerable.Empty<WorkItem>().AsQueryable();
             }
@@ -88,8 +90,9 @@ namespace Worknest.Services.Core.GraphQL
             return context.WorkItems
                 .Include(wi => wi.Reporter)
                 .Include(wi => wi.Assignee)
-                .Include(wi => wi.Comments) // ✅ ADD THIS LINE
-                .Where(wi => wi.Key.StartsWith(spaceKey + "-"));
+                .Include(wi => wi.Comments)
+                    .ThenInclude(c => c.Author)
+                .Where(wi => wi.SpaceId == spaceId.Value);
         }
 
         [Authorize]
@@ -117,6 +120,7 @@ namespace Worknest.Services.Core.GraphQL
                 .Include(wi => wi.Assignee)
                 .Include(wi => wi.BoardColumn)
                 .Include(wi => wi.Comments)
+                    .ThenInclude(c => c.Author)
                     
                 .Include(wi => wi.Activities)  // Populates the History tab
                     .ThenInclude(a => a.Author)

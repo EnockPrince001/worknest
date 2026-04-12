@@ -12,8 +12,8 @@ using Worknest.Data;
 namespace Worknest.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260216165406_LinkActivitiesToWorkItem")]
-    partial class LinkActivitiesToWorkItem
+    [Migration("20260412111723_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -181,16 +181,11 @@ namespace Worknest.Data.Migrations
                     b.Property<Guid>("WorkItemId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("WorkItemId1")
-                        .HasColumnType("uniqueidentifier");
-
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorId");
 
                     b.HasIndex("WorkItemId");
-
-                    b.HasIndex("WorkItemId1");
 
                     b.ToTable("Activities");
                 });
@@ -416,6 +411,9 @@ namespace Worknest.Data.Migrations
                     b.Property<Guid?>("BoardColumnId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("CreatedDate")
                         .HasColumnType("datetime2");
 
@@ -425,12 +423,21 @@ namespace Worknest.Data.Migrations
                     b.Property<DateTime?>("DueDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid?>("EpicId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<bool>("Flagged")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsCompleted")
                         .HasColumnType("bit");
 
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
 
                     b.Property<Guid?>("ParentWorkItemId")
                         .HasColumnType("uniqueidentifier");
@@ -440,6 +447,9 @@ namespace Worknest.Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("ReporterId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SpaceId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("SprintId")
@@ -452,6 +462,9 @@ namespace Worknest.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("UpdatedDate")
                         .HasColumnType("datetime2");
 
@@ -461,13 +474,43 @@ namespace Worknest.Data.Migrations
 
                     b.HasIndex("BoardColumnId");
 
+                    b.HasIndex("EpicId");
+
                     b.HasIndex("ParentWorkItemId");
 
                     b.HasIndex("ReporterId");
 
+                    b.HasIndex("SpaceId");
+
                     b.HasIndex("SprintId");
 
                     b.ToTable("WorkItems");
+                });
+
+            modelBuilder.Entity("Worknest.Data.Models.WorkItemComment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CommentText")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("WorkItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkItemId");
+
+                    b.ToTable("WorkItemComments");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -530,14 +573,10 @@ namespace Worknest.Data.Migrations
                         .IsRequired();
 
                     b.HasOne("Worknest.Data.Models.WorkItem", "WorkItem")
-                        .WithMany()
+                        .WithMany("Activities")
                         .HasForeignKey("WorkItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("Worknest.Data.Models.WorkItem", null)
-                        .WithMany("Activities")
-                        .HasForeignKey("WorkItemId1");
 
                     b.Navigation("Author");
 
@@ -564,7 +603,7 @@ namespace Worknest.Data.Migrations
                         .IsRequired();
 
                     b.HasOne("Worknest.Data.Models.WorkItem", "WorkItem")
-                        .WithMany("Comments")
+                        .WithMany()
                         .HasForeignKey("WorkItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -627,6 +666,10 @@ namespace Worknest.Data.Migrations
                         .HasForeignKey("BoardColumnId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Worknest.Data.Models.WorkItem", "Epic")
+                        .WithMany()
+                        .HasForeignKey("EpicId");
+
                     b.HasOne("Worknest.Data.Models.WorkItem", "ParentWorkItem")
                         .WithMany("Subtasks")
                         .HasForeignKey("ParentWorkItemId")
@@ -638,6 +681,10 @@ namespace Worknest.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Worknest.Data.Models.Space", "Space")
+                        .WithMany()
+                        .HasForeignKey("SpaceId");
+
                     b.HasOne("Worknest.Data.Models.Sprint", "Sprint")
                         .WithMany("WorkItems")
                         .HasForeignKey("SprintId");
@@ -646,11 +693,24 @@ namespace Worknest.Data.Migrations
 
                     b.Navigation("BoardColumn");
 
+                    b.Navigation("Epic");
+
                     b.Navigation("ParentWorkItem");
 
                     b.Navigation("Reporter");
 
+                    b.Navigation("Space");
+
                     b.Navigation("Sprint");
+                });
+
+            modelBuilder.Entity("Worknest.Data.Models.WorkItemComment", b =>
+                {
+                    b.HasOne("Worknest.Data.Models.WorkItem", null)
+                        .WithMany("Comments")
+                        .HasForeignKey("WorkItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Worknest.Data.Models.Space", b =>

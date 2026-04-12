@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Worknest.Data.Models
@@ -9,7 +9,7 @@ namespace Worknest.Data.Models
         public Guid Id { get; set; } = Guid.NewGuid();
 
         [Required]
-        public string Content { get; set; }
+        public string Content { get; set; } = default!;
 
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
@@ -17,12 +17,12 @@ namespace Worknest.Data.Models
         [Required]
         public Guid WorkItemId { get; set; }
         [ForeignKey("WorkItemId")]
-        public WorkItem WorkItem { get; set; }
+        public WorkItem WorkItem { get; set; } = default!;
 
         // Relationship to Author (User)
         [Required]
         public Guid AuthorId { get; set; }
         [ForeignKey("AuthorId")]
-        public User Author { get; set; }
+        public User Author { get; set; } = default!;
     }
 }

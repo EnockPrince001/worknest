@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Worknest.Data.Enums;
 
@@ -10,10 +10,10 @@ namespace Worknest.Data.Models
         public Guid Id { get; set; } = Guid.NewGuid();
 
         [Required]
-        public string Key { get; set; } // e.g., "PROJ-123"
+        public string Key { get; set; } = default!; // e.g., "PROJ-123"
 
         [Required]
-        public string Summary { get; set; }
+        public string Summary { get; set; } = default!;
 
         public string? Description { get; set; }
         
@@ -42,7 +42,7 @@ namespace Worknest.Data.Models
         [Required]
         public Guid ReporterId { get; set; }
         [ForeignKey("ReporterId")]
-        public User Reporter { get; set; }
+        public User Reporter { get; set; } = default!;
 
         public Guid? BoardColumnId { get; set; }
         [ForeignKey("BoardColumnId")]

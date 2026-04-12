@@ -1,11 +1,11 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Worknest.Services.Core.Models
 {
     public class CreateSprintInput
     {
         [Required]
-        public string Name { get; set; }
+        public string Name { get; set; } = default!;
 
         [Required]
         public Guid SpaceId { get; set; } // The space this sprint belongs to
