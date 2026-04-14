@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authorization;
@@ -75,8 +75,8 @@ namespace Worknest.Services.Identity.Controllers
             {
                 Token = authResponse.Token,
                 Expiration = authResponse.Expiration,
-                Email = user.Email,
-                Username = user.FullName ?? user.UserName,  // Return FullName, fallback to UserName
+                Email = user.Email!,
+                Username = user.FullName ?? user.UserName!,  // Return FullName, fallback to UserName
                 JobTitle = user.JobTitle
             });
         }
@@ -148,7 +148,7 @@ namespace Worknest.Services.Identity.Controllers
 
         private (string Token, DateTime Expiration) GenerateJwtToken(IEnumerable<Claim> claims)
         {
-            var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+            var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
             var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],

@@ -1,11 +1,11 @@
-﻿namespace Worknest.Services.Identity.Models
+namespace Worknest.Services.Identity.Models
 {
     public class AuthResponseDto
     {
-        public string Token { get; set; }
+        public string Token { get; set; } = default!;
         public DateTime Expiration { get; set; }
-        public string Email { get; set; }
-        public string Username { get; set; }
+        public string Email { get; set; } = default!;
+        public string Username { get; set; } = default!;
         public string? JobTitle { get; set; }
     }
 }

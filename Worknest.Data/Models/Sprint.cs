@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Worknest.Data.Enums;
 
@@ -10,7 +10,7 @@ namespace Worknest.Data.Models
         public Guid Id { get; set; } = Guid.NewGuid();
 
         [Required]
-        public string Name { get; set; }
+        public string Name { get; set; } = default!;
 
         public string? Goal { get; set; }
 
@@ -27,7 +27,7 @@ namespace Worknest.Data.Models
         [Required]
         public Guid SpaceId { get; set; }
         [ForeignKey("SpaceId")]
-        public Space Space { get; set; }
+        public Space Space { get; set; } = default!;
 
         // A sprint has many work items
         public ICollection<WorkItem> WorkItems { get; set; } = new List<WorkItem>();

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using Worknest.Data.Enums;
 
 namespace Worknest.Data.Models
@@ -8,11 +8,11 @@ namespace Worknest.Data.Models
     {
         [Required]
         public Guid UserId { get; set; }
-        public User User { get; set; }
+        public User User { get; set; } = default!;
 
         [Required]
         public Guid SpaceId { get; set; }
-        public Space Space { get; set; }
+        public Space Space { get; set; } = default!;
 
         [Required]
         public SpaceRole Role { get; set; }

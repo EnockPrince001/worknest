@@ -30,41 +30,29 @@ namespace Worknest.Services.Core.GraphQL
             var owner = await context.Users.FindAsync(userId);
             if (owner == null) throw new Exception("User not found");
 
+            var normalizedKey = input.Key.Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(normalizedKey))
+                throw new GraphQLException("Space key cannot be empty.");
+
+            var keyExists = await context.Spaces.AnyAsync(s => s.Key == normalizedKey);
+            if (keyExists)
+                throw new GraphQLException("Space key already exists.");
+
             var space = new Space
             {
-                Name = input.Name,
-                Key = input.Key.ToUpper(),
+                Name = input.Name.Trim(),
+                Key = normalizedKey,
                 Type = input.Type,
                 OwnerId = userId,
                 Owner = owner
             };
-            var existingCols = await context.BoardColumns
-     .Where(c => c.SpaceId == space.Id && c.IsSystem)
-     .ToListAsync();
 
-            var cols = new List<BoardColumn>();
-
-            void EnsureColumn(string name, int order)
+            var cols = new List<BoardColumn>
             {
-                if (!existingCols.Any(c => c.Name == name && c.SpaceId == space.Id))
-                {
-                    cols.Add(new BoardColumn
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = name,
-                        Order = order,
-                        IsSystem = true,
-                        SpaceId = space.Id   // <-- CRITICAL FIX
-                    });
-                }
-            }
-
-            EnsureColumn("TO DO", 0);
-            EnsureColumn("IN PROGRESS", 1);
-            EnsureColumn("DONE", 2);
-
-            if (cols.Count > 0)
-                await context.BoardColumns.AddRangeAsync(cols);
+                new() { Name = "TO DO", Order = 0, IsSystem = true, SpaceId = space.Id },
+                new() { Name = "IN PROGRESS", Order = 1, IsSystem = true, SpaceId = space.Id },
+                new() { Name = "DONE", Order = 2, IsSystem = true, SpaceId = space.Id }
+            };
 
             await context.Spaces.AddAsync(space);
             await context.BoardColumns.AddRangeAsync(cols);
@@ -73,6 +61,54 @@ namespace Worknest.Services.Core.GraphQL
             await context.SpaceMembers.AddAsync(member);
             await context.SaveChangesAsync();
 
+            return space;
+        }
+
+        [Authorize]
+        public async Task<Space> UpdateSpace(
+            Guid spaceId,
+            UpdateSpaceInput input,
+            [Service] AppDbContext context,
+            ClaimsPrincipal claimsPrincipal)
+        {
+            var userId = GetUserId(claimsPrincipal);
+            var membership = await context.SpaceMembers.AsNoTracking()
+                .FirstOrDefaultAsync(m => m.SpaceId == spaceId && m.UserId == userId);
+
+            if (membership == null || membership.Role != SpaceRole.ADMINISTRATOR)
+                throw new GraphQLException("Unauthorized: Admin role required.");
+
+            var space = await context.Spaces.FindAsync(spaceId);
+            if (space == null)
+                throw new GraphQLException("Space not found.");
+
+            if (input.Name.HasValue)
+            {
+                var newName = input.Name.Value?.Trim();
+                if (string.IsNullOrWhiteSpace(newName))
+                    throw new GraphQLException("Space name cannot be empty.");
+                space.Name = newName;
+            }
+
+            if (input.Key.HasValue)
+            {
+                var newKey = input.Key.Value?.Trim().ToUpperInvariant();
+                if (string.IsNullOrWhiteSpace(newKey))
+                    throw new GraphQLException("Space key cannot be empty.");
+
+                var keyExists = await context.Spaces.AnyAsync(s => s.Id != spaceId && s.Key == newKey);
+                if (keyExists)
+                    throw new GraphQLException("Space key already exists.");
+
+                space.Key = newKey;
+            }
+
+            if (input.Type.HasValue && input.Type.Value.HasValue)
+            {
+                space.Type = input.Type.Value.Value;
+            }
+
+            await context.SaveChangesAsync();
             return space;
         }
 
@@ -193,10 +229,28 @@ namespace Worknest.Services.Core.GraphQL
                 workItem.Description = newVal;
             }
 
-            if (input.BoardColumnId.HasValue) {
+            if (input.BoardColumnId.HasValue)
+            {
                 var newVal = input.BoardColumnId.Value;
+
+                // Get the column being moved to
+                var column = await context.BoardColumns.FindAsync(newVal);
+
                 LogChange("Status", workItem.BoardColumnId?.ToString(), newVal?.ToString());
+
                 workItem.BoardColumnId = newVal;
+
+                // ✅ NEW LOGIC: Auto mark as completed if moved to DONE
+                if (column != null && column.Name.ToUpper() == "DONE")
+                {
+                    workItem.IsCompleted = true;
+                    workItem.CompletedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    workItem.IsCompleted = false;
+                    workItem.CompletedAt = null;
+                }
             }
 
             if (input.SprintId.HasValue) {
@@ -349,6 +403,147 @@ namespace Worknest.Services.Core.GraphQL
         }
 
         [Authorize]
+        public async Task<WorkItemComment> AddWorkItemComment(
+            Guid workItemId,
+            string commentText,
+            [Service] AppDbContext context,
+            ClaimsPrincipal claimsPrincipal)
+        {
+            return await AddComment(workItemId, commentText, context, claimsPrincipal);
+        }
+
+        [Authorize]
+        public async Task<WorkItemComment> AddComment(
+            Guid workItemId,
+            string content,
+            [Service] AppDbContext context,
+            ClaimsPrincipal claimsPrincipal)
+        {
+            var userId = GetUserId(claimsPrincipal);
+            if (string.IsNullOrWhiteSpace(content))
+                throw new GraphQLException("Comment cannot be empty.");
+
+            var workItemExists = await context.WorkItems.AnyAsync(w => w.Id == workItemId);
+            if (!workItemExists)
+                throw new GraphQLException("Work item not found.");
+
+            var comment = new WorkItemComment
+            {
+                Id = Guid.NewGuid(),
+                WorkItemId = workItemId,
+                CommentText = content.Trim(),
+                CreatedBy = userId,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.WorkItemComments.AddAsync(comment);
+
+            await context.SaveChangesAsync();
+            await context.Entry(comment).Reference(c => c.Author).LoadAsync();
+
+            return comment;
+        }
+
+        [Authorize]
+        public async Task<WorkItemComment> UpdateWorkItemComment(
+    Guid commentId,
+    string commentText,
+    [Service] AppDbContext context,
+    ClaimsPrincipal claimsPrincipal)
+        {
+            var userId = GetUserId(claimsPrincipal);
+            var comment = await context.WorkItemComments.FindAsync(commentId);
+
+            if (comment == null)
+                throw new GraphQLException("Comment not found.");
+
+            if (comment.CreatedBy.HasValue && comment.CreatedBy.Value != userId)
+                throw new GraphQLException("Unauthorized to edit this comment.");
+
+            if (string.IsNullOrWhiteSpace(commentText))
+                throw new GraphQLException("Comment cannot be empty.");
+
+            comment.CommentText = commentText.Trim();
+
+            await context.SaveChangesAsync();
+            await context.Entry(comment).Reference(c => c.Author).LoadAsync();
+
+            return comment;
+        }
+
+        [Authorize]
+        public async Task<bool> DeleteWorkItemComment(
+            Guid commentId,
+            [Service] AppDbContext context,
+            ClaimsPrincipal claimsPrincipal)
+        {
+            var userId = GetUserId(claimsPrincipal);
+            var comment = await context.WorkItemComments.FindAsync(commentId);
+
+            if (comment == null)
+                throw new GraphQLException("Comment not found.");
+
+            if (comment.CreatedBy.HasValue && comment.CreatedBy.Value != userId)
+                throw new GraphQLException("Unauthorized to delete this comment.");
+
+            context.WorkItemComments.Remove(comment);
+
+            await context.SaveChangesAsync();
+
+            return true;
+        }
+
+        [Authorize]
+        public async Task<List<WorkItem>> MoveWorkItem(
+    Guid workItemId,
+    Guid targetColumnId,
+    int targetIndex,
+    [Service] AppDbContext context)
+        {
+            var item = await context.WorkItems.FindAsync(workItemId);
+            if (item == null)
+                throw new GraphQLException("Work item not found");
+
+            // 🔹 Get ALL items in target column
+            var targetItems = await context.WorkItems
+                .Where(w => w.BoardColumnId == targetColumnId && w.Id != workItemId)
+                .OrderBy(w => w.Order)
+                .ThenBy(w => w.Id)
+                .ToListAsync();
+
+            // 🔹 Remove item from old column list
+            var sourceItems = await context.WorkItems
+                .Where(w => w.BoardColumnId == item.BoardColumnId && w.Id != workItemId)
+                .OrderBy(w => w.Order)
+                .ToListAsync();
+
+            // 🔹 Reorder source column
+            for (int i = 0; i < sourceItems.Count; i++)
+            {
+                sourceItems[i].Order = i;
+            }
+
+            // 🔹 Move item to new column
+            item.BoardColumnId = targetColumnId;
+
+            // 🔹 Insert into target position
+            if (targetIndex < 0) targetIndex = 0;
+            if (targetIndex > targetItems.Count) targetIndex = targetItems.Count;
+
+            targetItems.Insert(targetIndex, item);
+
+            // 🔹 Reorder target column
+            for (int i = 0; i < targetItems.Count; i++)
+            {
+                targetItems[i].Order = i;
+            }
+
+            await context.SaveChangesAsync();
+
+            return targetItems;
+        }
+
+        [Authorize]
         public async Task<bool> DeleteBoardColumn(
             Guid columnId,
             Guid targetColumnId,
@@ -388,6 +583,7 @@ namespace Worknest.Services.Core.GraphQL
             await context.SaveChangesAsync();
             return true;
         }
+
         [Authorize]
         public async Task<List<WorkItem>> MoveWorkItemUp(
             Guid workItemId,
@@ -413,6 +609,23 @@ namespace Worknest.Services.Core.GraphQL
             await context.SaveChangesAsync();
 
             return items.OrderBy(w => w.Order).ToList();
+        }
+
+        [Authorize]
+        public async Task<bool> DeleteWorkItem(
+    Guid workItemId,
+    [Service] AppDbContext context)
+        {
+            var workItem = await context.WorkItems.FindAsync(workItemId);
+
+            if (workItem == null)
+                throw new GraphQLException("Work item not found.");
+
+            context.WorkItems.Remove(workItem);
+
+            await context.SaveChangesAsync();
+
+            return true;
         }
 
         [Authorize]
@@ -545,8 +758,12 @@ namespace Worknest.Services.Core.GraphQL
             var parentItem = await context.WorkItems.FindAsync(parentWorkItemId);
             if (parentItem == null) throw new GraphQLException("Parent not found.");
 
-            var spaceKey = parentItem.Key.Split('-')[0];
-            var space = await context.Spaces.Include(s => s.BoardColumns).FirstOrDefaultAsync(s => s.Key == spaceKey);
+            if (!parentItem.SpaceId.HasValue)
+                throw new GraphQLException("Parent item is not associated with a space.");
+
+            var space = await context.Spaces
+                .Include(s => s.BoardColumns)
+                .FirstOrDefaultAsync(s => s.Id == parentItem.SpaceId.Value);
             if (space == null) throw new GraphQLException("Space associated with parent item not found.");
 
             var firstColumn = space.BoardColumns.OrderBy(c => c.Order).FirstOrDefault();
@@ -570,8 +787,30 @@ namespace Worknest.Services.Core.GraphQL
 
         private async Task<int> GetNextWorkItemKey(AppDbContext context, Guid spaceId)
         {
-            var count = await context.WorkItems.CountAsync(wi => wi.Key.Contains("-"));
-            return count + 1;
+            var spaceKey = await context.Spaces
+                .Where(s => s.Id == spaceId)
+                .Select(s => s.Key)
+                .SingleAsync();
+
+            var prefix = $"{spaceKey}-";
+            var keys = await context.WorkItems
+                .Where(wi => wi.SpaceId == spaceId && wi.Key.StartsWith(prefix))
+                .Select(wi => wi.Key)
+                .ToListAsync();
+
+            var max = 0;
+            foreach (var key in keys)
+            {
+                if (key.Length <= prefix.Length) continue;
+
+                var suffix = key.Substring(prefix.Length);
+                if (int.TryParse(suffix, out var parsed) && parsed > max)
+                {
+                    max = parsed;
+                }
+            }
+
+            return max + 1;
         }
     }
 }

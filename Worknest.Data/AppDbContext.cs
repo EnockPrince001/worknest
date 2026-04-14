@@ -14,6 +14,7 @@ namespace Worknest.Data
         public DbSet<SpaceMember> SpaceMembers { get; set; }
         public DbSet<Sprint> Sprints { get; set; }
         public DbSet<WorkItem> WorkItems { get; set; }
+        public DbSet<WorkItemComment> WorkItemComments { get; set; }
         public DbSet<Comment> Comments { get; set; }
         public DbSet<BoardColumn> BoardColumns { get; set; }
         
@@ -64,6 +65,18 @@ namespace Worknest.Data
                 .HasForeignKey(c => c.AuthorId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<WorkItemComment>()
+                .HasOne(c => c.WorkItem)
+                .WithMany(wi => wi.Comments)
+                .HasForeignKey(c => c.WorkItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<WorkItemComment>()
+                .HasOne(c => c.Author)
+                .WithMany()
+                .HasForeignKey(c => c.CreatedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // --- ADD ACTIVITY CONFIGURATION ---
             modelBuilder.Entity<Activity>()
                 .HasOne(a => a.WorkItem)
@@ -95,6 +108,14 @@ namespace Worknest.Data
                 .WithMany()
                 .HasForeignKey(wi => wi.BoardColumnId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Space>()
+                .HasIndex(s => s.Key)
+                .IsUnique();
+
+            modelBuilder.Entity<WorkItem>()
+                .HasIndex(w => w.Key)
+                .IsUnique();
 
             // Enum Conversions
             modelBuilder.Entity<Space>().Property(s => s.Type).HasConversion<string>();

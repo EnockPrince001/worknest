@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Worknest.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class RefactorToDynamicColumns : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -31,6 +31,7 @@ namespace Worknest.Data.Migrations
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     FullName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    JobTitle = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     UserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
@@ -256,17 +257,23 @@ namespace Worknest.Data.Migrations
                     Key = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Summary = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Type = table.Column<int>(type: "int", nullable: false),
                     Priority = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     StoryPoints = table.Column<int>(type: "int", nullable: true),
                     DueDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     Flagged = table.Column<bool>(type: "bit", nullable: false),
+                    IsCompleted = table.Column<bool>(type: "bit", nullable: false),
+                    CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    Order = table.Column<int>(type: "int", nullable: false),
                     ReporterId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     BoardColumnId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     AssigneeId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     SprintId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    ParentWorkItemId = table.Column<Guid>(type: "uniqueidentifier", nullable: true)
+                    ParentWorkItemId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    SpaceId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    EpicId = table.Column<Guid>(type: "uniqueidentifier", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -290,9 +297,19 @@ namespace Worknest.Data.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
+                        name: "FK_WorkItems_Spaces_SpaceId",
+                        column: x => x.SpaceId,
+                        principalTable: "Spaces",
+                        principalColumn: "Id");
+                    table.ForeignKey(
                         name: "FK_WorkItems_Sprints_SprintId",
                         column: x => x.SprintId,
                         principalTable: "Sprints",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_WorkItems_WorkItems_EpicId",
+                        column: x => x.EpicId,
+                        principalTable: "WorkItems",
                         principalColumn: "Id");
                     table.ForeignKey(
                         name: "FK_WorkItems_WorkItems_ParentWorkItemId",
@@ -300,6 +317,35 @@ namespace Worknest.Data.Migrations
                         principalTable: "WorkItems",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Activities",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    WorkItemId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Field = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    OldValue = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    NewValue = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    AuthorId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CreatedDate = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Activities", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Activities_AspNetUsers_AuthorId",
+                        column: x => x.AuthorId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Activities_WorkItems_WorkItemId",
+                        column: x => x.WorkItemId,
+                        principalTable: "WorkItems",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -328,6 +374,37 @@ namespace Worknest.Data.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
+
+            migrationBuilder.CreateTable(
+                name: "WorkItemComments",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    WorkItemId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CommentText = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedBy = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_WorkItemComments", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_WorkItemComments_WorkItems_WorkItemId",
+                        column: x => x.WorkItemId,
+                        principalTable: "WorkItems",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Activities_AuthorId",
+                table: "Activities",
+                column: "AuthorId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Activities_WorkItemId",
+                table: "Activities",
+                column: "WorkItemId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AspNetRoleClaims_RoleId",
@@ -399,6 +476,11 @@ namespace Worknest.Data.Migrations
                 column: "SpaceId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_WorkItemComments_WorkItemId",
+                table: "WorkItemComments",
+                column: "WorkItemId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_WorkItems_AssigneeId",
                 table: "WorkItems",
                 column: "AssigneeId");
@@ -407,6 +489,11 @@ namespace Worknest.Data.Migrations
                 name: "IX_WorkItems_BoardColumnId",
                 table: "WorkItems",
                 column: "BoardColumnId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WorkItems_EpicId",
+                table: "WorkItems",
+                column: "EpicId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_WorkItems_ParentWorkItemId",
@@ -419,6 +506,11 @@ namespace Worknest.Data.Migrations
                 column: "ReporterId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_WorkItems_SpaceId",
+                table: "WorkItems",
+                column: "SpaceId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_WorkItems_SprintId",
                 table: "WorkItems",
                 column: "SprintId");
@@ -427,6 +519,9 @@ namespace Worknest.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "Activities");
+
             migrationBuilder.DropTable(
                 name: "AspNetRoleClaims");
 
@@ -447,6 +542,9 @@ namespace Worknest.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "SpaceMembers");
+
+            migrationBuilder.DropTable(
+                name: "WorkItemComments");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");

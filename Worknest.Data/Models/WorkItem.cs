@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Worknest.Data.Enums;
 
@@ -10,10 +10,10 @@ namespace Worknest.Data.Models
         public Guid Id { get; set; } = Guid.NewGuid();
 
         [Required]
-        public string Key { get; set; } // e.g., "PROJ-123"
+        public string Key { get; set; } = default!; // e.g., "PROJ-123"
 
         [Required]
-        public string Summary { get; set; }
+        public string Summary { get; set; } = default!;
 
         public string? Description { get; set; }
         
@@ -31,6 +31,10 @@ namespace Worknest.Data.Models
 
         public bool Flagged { get; set; }
 
+        // ✅ ADD THESE TWO LINES HERE
+        public bool IsCompleted { get; set; } = false;
+        public DateTime? CompletedAt { get; set; }
+
         public int Order { get; set; }
 
         // --- Relationships ---
@@ -38,7 +42,7 @@ namespace Worknest.Data.Models
         [Required]
         public Guid ReporterId { get; set; }
         [ForeignKey("ReporterId")]
-        public User Reporter { get; set; }
+        public User Reporter { get; set; } = default!;
 
         public Guid? BoardColumnId { get; set; }
         [ForeignKey("BoardColumnId")]
@@ -61,7 +65,7 @@ namespace Worknest.Data.Models
         public ICollection<WorkItem> Subtasks { get; set; } = new List<WorkItem>();
 
         // A work item can have many comments
-        public ICollection<Comment> Comments { get; set; } = new List<Comment>();
+        public ICollection<WorkItemComment> Comments { get; set; } = new List<WorkItemComment>();
         // Add this to the WorkItem class
         public virtual ICollection<Activity> Activities { get; set; } = new List<Activity>();
 
