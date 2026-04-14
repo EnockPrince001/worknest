@@ -1,8 +1,8 @@
 using HotChocolate.Data;
-using Microsoft.AspNetCore.Authentication.JwtBearer; 
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens; 
-using System.Text; 
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using Worknest.Data;
 using Worknest.Services.Core.GraphQL;
 
@@ -15,7 +15,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy(name: MyAllowSpecificOrigins,
         policy =>
         {
-            policy.WithOrigins("http://localhost:8080", "https://localhost:8080") 
+            policy.WithOrigins("http://localhost:8080", "https://localhost:8080")
                   .AllowAnyHeader()
                   .AllowAnyMethod();
         });
@@ -73,10 +73,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseCors(MyAllowSpecificOrigins); 
+app.UseCors(MyAllowSpecificOrigins);
 
-app.UseAuthentication(); 
-app.UseAuthorization(); 
+app.UseAuthentication();
+app.UseAuthorization();
 
 
 // --- 8. Auto-migrate database on startup ---
@@ -86,7 +86,9 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<AppDbContext>();
-        context.Database.Migrate();
+        // Migrations are managed by Worknest.Services.Identity
+        // Core only ensures the connection is valid
+        context.Database.CanConnect();
     }
     catch (Exception ex)
     {

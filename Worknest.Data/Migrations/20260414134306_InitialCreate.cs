@@ -164,7 +164,7 @@ namespace Worknest.Data.Migrations
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Key = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Key = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     Type = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     OwnerId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
                 },
@@ -254,7 +254,7 @@ namespace Worknest.Data.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Key = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Key = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     Summary = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     Type = table.Column<int>(type: "int", nullable: false),
@@ -389,6 +389,12 @@ namespace Worknest.Data.Migrations
                 {
                     table.PrimaryKey("PK_WorkItemComments", x => x.Id);
                     table.ForeignKey(
+                        name: "FK_WorkItemComments_AspNetUsers_CreatedBy",
+                        column: x => x.CreatedBy,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
                         name: "FK_WorkItemComments_WorkItems_WorkItemId",
                         column: x => x.WorkItemId,
                         principalTable: "WorkItems",
@@ -466,6 +472,12 @@ namespace Worknest.Data.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Spaces_Key",
+                table: "Spaces",
+                column: "Key",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Spaces_OwnerId",
                 table: "Spaces",
                 column: "OwnerId");
@@ -474,6 +486,11 @@ namespace Worknest.Data.Migrations
                 name: "IX_Sprints_SpaceId",
                 table: "Sprints",
                 column: "SpaceId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WorkItemComments_CreatedBy",
+                table: "WorkItemComments",
+                column: "CreatedBy");
 
             migrationBuilder.CreateIndex(
                 name: "IX_WorkItemComments_WorkItemId",
@@ -494,6 +511,12 @@ namespace Worknest.Data.Migrations
                 name: "IX_WorkItems_EpicId",
                 table: "WorkItems",
                 column: "EpicId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WorkItems_Key",
+                table: "WorkItems",
+                column: "Key",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_WorkItems_ParentWorkItemId",
